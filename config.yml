@@ -1,0 +1,6 @@
+clustering:
+  maxBlockDiff: 10000
+  maxETHDiff: 0.01
+
+log:
+  level: info

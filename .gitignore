@@ -1,0 +1,4 @@
+# Git Ignore file
+.idea
+# tmp files
+*.log

@@ -1,0 +1,93 @@
+version: '3.3'
+
+services:
+  blockchain-sealer1:
+    image: blockchain-geth
+    build:
+      context: ${DockerPath}
+    env_file: .env
+    ports:
+      - 59047:59047
+      - 59048:59048
+    environment:
+      - NODE_TYPE=SEALER
+      - NODE_RPC=59047
+      - NODE_WS=59048
+      - RPC_VHOSTS=*
+      - ETHER_BASE=0x4Eca8A67c2FAa4Db16075Cba94CA5672b16D40FD
+      - ENODE_KEY=22b53d6728e9e794ac72fe5ef446891a8fc67e1cea196b061a346a3503a2e752
+    networks:
+      chainnet:
+        ipv4_address: 172.25.0.3
+
+  blockchain-sealer2:
+    image: blockchain-geth
+    env_file: .env
+    ports:
+      - 59049:59049
+      - 59050:59050
+    environment:
+      - NODE_TYPE=SEALER
+      - NODE_RPC=59049
+      - NODE_WS=59050
+      - RPC_VHOSTS=*
+      - ETHER_BASE=0xd5eD3DE0FcB889bbDB8833dEBbbf03078C79637B
+      - ENODE_KEY=22b53d6728e9e794ac72fe5ef446891a8fc67e1cea196b061a346a3503a2e751
+    networks:
+      chainnet:
+        ipv4_address: 172.25.0.4
+
+  blockchain-sealer3:
+    image: blockchain-geth
+    env_file: .env
+    ports:
+      - 59051:59051
+      - 59052:59052
+    environment:
+      - NODE_TYPE=SEALER
+      - NODE_RPC=59051
+      - NODE_WS=59052
+      - RPC_VHOSTS=*
+      - ETHER_BASE=0x176d59CCEBcbcd75f296593B42C753EF2337D80E
+      - ENODE_KEY=22b53d6728e9e794ac72fe5ef446891a8fc67e1cea196b061a346a3503a2e750
+    networks:
+      chainnet:
+        ipv4_address: 172.25.0.5
+
+  blockchain-sealer4:
+    image: blockchain-geth
+    env_file: .env
+    ports:
+      - 59053:59053
+      - 59054:59054
+    environment:
+      - NODE_TYPE=SEALER
+      - NODE_RPC=59053
+      - NODE_WS=59054
+      - RPC_VHOSTS=*
+      - ETHER_BASE=0x741db03f0bc87c7065977cc1b8726bc78d418781
+      - ENODE_KEY=acd909d80f156e00143571c42c1d3cddea39c787f8977ed24e09c890120408f7
+    networks:
+      chainnet:
+        ipv4_address: 172.25.0.6
+
+  blockchain-sealer5:
+    image: blockchain-geth
+    env_file: .env
+    ports:
+      - 59055:59055
+      - 59056:59056
+    environment:
+      - NODE_TYPE=SEALER
+      - NODE_RPC=59055
+      - NODE_WS=59056
+      - RPC_VHOSTS=*
+      - ETHER_BASE=0xb582dd36789c957068c39e8b2207d05b4ee736f0
+      - ENODE_KEY=a1e4d8506e1e95372eb40d640507d9e24d3cc1f2ae9f7943eb2419fa2a184d08
+    networks:
+      chainnet:
+        ipv4_address: 172.25.0.7
+networks:
+  chainnet:
+    external:
+      name: chainnet
