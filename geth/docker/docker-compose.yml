@@ -87,6 +87,7 @@ services:
     networks:
       chainnet:
         ipv4_address: 172.25.0.7
+
 networks:
   chainnet:
     external:

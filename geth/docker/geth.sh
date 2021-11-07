@@ -1,7 +1,7 @@
 #!/usr/bin/env ash
 
 #GAS_PRICE_PARAMS=--miner.gastarget=4294967040 --miner.gaslimit=4294967040
-GAS_PRICE_PARAMS="--miner.gastarget=${MinerGasTarget} --miner.gaslimit=${MinerGasLimit} --miner.gasprice=${GAS_PRICE}"
+GAS_PRICE_PARAMS="--miner.gastarget=${MinerGasTarget} --miner.gaslimit=${MinerGasLimit} --miner.gasprice=${GasPrice}"
 #TX_POOL="--txpool.pricelimit=0 --txpool.globalslots=140960 --txpool.globalqueue=160240"
 TX_POOL="--txpool.nolocals --txpool.pricelimit=${TxpoolPriceLimit} --txpool.accountslots=${TxpoolAccountSlots} --txpool.globalslots=${TxpoolGlobalSlots} --txpool.accountqueue=${TxpoolAccountQueue} --txpool.globalqueue=${TxpoolGlobalQueue}"
 CACHE_PARAMS="--cache=${Cache} --cache.database=${CacheDatabase} --cache.trie=${CacheTrie} --cache.gc=${CacheGC}"
@@ -18,7 +18,7 @@ HOST_IP="$(hostname -i)"
 HOST_NAME="${NODE_TYPE}-${HOST_IP}"
 VPC_CIDR_IP="172.25.0.0/24"
 
-echo "GAS_PRICE ${GAS_PRICE}"
+echo "GAS_PRICE ${GasPrice}"
 echo "HOST_IP: ${HOST_IP}"
 echo "HOST_NAME: ${HOST_NAME}"
 echo "VPC_CIDR_IP: ${VPC_CIDR_IP}"
