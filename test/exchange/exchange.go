@@ -1,9 +1,11 @@
 package exchange
 
 import (
+	"context"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/google/uuid"
 	"nir/test/entity/account"
+	"nir/test/writer"
 )
 
 type Exchange struct {
@@ -56,4 +58,36 @@ func (exch *Exchange) CreateAccountIfNotExist(address *common.Address) (*common.
 
 func (exch *Exchange) GetName() string {
 	return exch.name
+}
+
+func (exch *Exchange) GetEthFromDeposit(ctx context.Context, acc *common.Address, amount int64) error {
+	wr, err := writer.FromContext(ctx)
+	if err != nil {
+		return err
+	}
+
+	for _, client := range exch.clients {
+		address := client.deposit.GetAddress()
+		if address == acc {
+
+			err := account.AddEtherToAccount(ctx, wr, address, writer.GasLimit)
+			if err != nil {
+				return err
+			}
+			_, err = client.deposit.SendTransaction(ctx, exch.account.GetAddress(), amount)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+func (exch *Exchange) GetAccounts() (addresses []*common.Address) {
+	for _, client := range exch.clients {
+		addresses = append(addresses, client.deposit.GetAddress())
+	}
+
+	return addresses
 }

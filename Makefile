@@ -1,8 +1,9 @@
 up:
-	rm -rf ./test/geth.ipc
-	touch ./test/geth.ipc
 	rm -Rdf ./geth/docker-data
-	cd ./geth/docker && docker-compose up --build --remove-orphans -V
+	docker-compose -f ./geth/docker/docker-compose.yml up --build --remove-orphans -V -d
+	go run ./test
+	docker-compose -f ./geth/docker/docker-compose.yml down
+	chmod -R 777 blockchain_data
 
 down:
 	cd ./geth/docker && docker-compose down

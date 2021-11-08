@@ -9,6 +9,8 @@ services:
     ports:
       - 59047:59047
       - 59048:59048
+    volumes:
+      - ../../blockchain_data:/root/output/
     environment:
       - NODE_TYPE=SEALER
       - NODE_RPC=59047
@@ -26,6 +28,8 @@ services:
     ports:
       - 59049:59049
       - 59050:59050
+    volumes:
+      - ../../blockchain_data:/root/output/
     environment:
       - NODE_TYPE=SEALER
       - NODE_RPC=59049
@@ -43,6 +47,8 @@ services:
     ports:
       - 59051:59051
       - 59052:59052
+    volumes:
+      - ../../blockchain_data:/root/output/
     environment:
       - NODE_TYPE=SEALER
       - NODE_RPC=59051
@@ -60,6 +66,8 @@ services:
     ports:
       - 59053:59053
       - 59054:59054
+    volumes:
+      - ../../blockchain_data:/root/output/
     environment:
       - NODE_TYPE=SEALER
       - NODE_RPC=59053
@@ -77,6 +85,8 @@ services:
     ports:
       - 59055:59055
       - 59056:59056
+    volumes:
+      - ../../blockchain_data:/root/output/
     environment:
       - NODE_TYPE=SEALER
       - NODE_RPC=59055

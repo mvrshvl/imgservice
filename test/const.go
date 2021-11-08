@@ -1,14 +1,13 @@
-package test
+package main
 
 const (
-	writerNode       = "ws://localhost:59048"
-	commonBalanceKey = "29f4455cd82770e305096f33c2a53f13efed2974873c883a6d7ca7d1bdcdf0c7"
-	commonAmount     = 100000
+	writerNode   = "ws://localhost:59048"
+	commonAmount = 10000000000
 
 	countExchanges            = 1
 	countCluster              = 1
-	countAccounts             = 100
-	countTransactions         = 1000
+	countAccounts             = 50
+	countTransactions         = 100
 	maxCountAccountsInCluster = 5
 	transactonsPerSecond      = 25
 )

@@ -9,4 +9,14 @@ COPY keystore /keystore
 COPY boot.key /boot.key
 COPY static-nodes.json /root/.ethereum/static-nodes.json
 
+ENV PYTHONUNBUFFERED=1
+
+RUN apk add build-base
+RUN apk add --update --no-cache python3 && ln -sf python3 /usr/bin/python
+RUN apk add python3-dev
+RUN python3 -m ensurepip
+RUN python -m pip install Cython
+RUN python -m pip install --no-cache --upgrade pip setuptools
+RUN python -m pip install ethereum-etl
+
 ENTRYPOINT ["/bin/sh", "/geth.sh"]
