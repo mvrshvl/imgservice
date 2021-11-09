@@ -1,4 +1,4 @@
-package deposit
+package transfer
 
 import (
 	"nir/clustering/blockchain"

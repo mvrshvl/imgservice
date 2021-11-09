@@ -60,7 +60,7 @@ func (exch *Exchange) startGettingTxs(ctx context.Context) {
 	for tx := range exch.incomingTx {
 		err := exch.GetEthFromDeposit(ctx, tx)
 		if err != nil {
-			log.Println("can't get eth from deposit", err)
+			log.Println("can't get eth from transfer", err)
 		}
 	}
 
