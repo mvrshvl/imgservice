@@ -42,6 +42,8 @@ func main() {
 		log.Fatal(err)
 	}
 
+	defer startbalance.Close(ctx)
+
 	exchanges, err := createExchanges(ctx, countExchanges)
 	if err != nil {
 		log.Fatal(err)
@@ -91,6 +93,11 @@ func main() {
 
 	if err = cmd.Run(); err != nil {
 		log.Fatal(err, "output", stderr.String())
+	}
+
+	err = exchange.SaveExchanges(exchanges)
+	if err != nil {
+		log.Fatal(err)
 	}
 
 	fmt.Println("Successful\n", stdout.String())
@@ -180,15 +187,12 @@ func SendTransactions(ctx context.Context, entities []*user.User, exchanges []*e
 				currentEntity := entities[currentTxNumber%int32(len(entities))]
 				currentExchange := exchanges[currentTxNumber%int32(len(exchanges))]
 
-				now := time.Now()
 				tx, err := currentEntity.SendTransaction(ctx, currentExchange.GetName(), int64(amount))
 				if err != nil {
 					log.Printf("can't send %d tranasction: %v\n", currentTxNumber, err)
 
 					return
 				}
-
-				fmt.Println("SENDING TX TO DEPOSIT", time.Since(now))
 
 				currentExchange.AddIncomingTransaction(tx)
 			}()

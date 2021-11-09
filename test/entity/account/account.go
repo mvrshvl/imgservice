@@ -3,6 +3,7 @@ package account
 import (
 	"context"
 	"crypto/ecdsa"
+	"fmt"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -70,7 +71,7 @@ func (acc *Account) SendTransaction(ctx context.Context, to *common.Address, amo
 		return w.SendTransaction(ctx, signedTx)
 	})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("cant send %s %w", crypto.PubkeyToAddress(acc.key.PublicKey).String(), err)
 	}
 
 	acc.nonce++

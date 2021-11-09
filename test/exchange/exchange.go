@@ -5,11 +5,16 @@ import (
 	"fmt"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/gocarina/gocsv"
 	"github.com/google/uuid"
 	"log"
 	"math/big"
+	"nir/clustering/blockchain"
+	"nir/config"
 	"nir/test/entity/account"
 	"nir/test/writer"
+	"os"
+	"strings"
 	"time"
 )
 
@@ -144,12 +149,34 @@ func waitBalance(ctx context.Context, neededBalance uint64, address common.Addre
 			return err
 		}
 
-		fmt.Println("WAIT BALANCE", neededBalance, balance.Uint64())
-
 		if balance.Uint64() >= neededBalance {
 			break
 		}
 	}
 
 	return nil
+}
+
+func SaveExchanges(exchanges []*Exchange) error {
+	cfg, err := config.New()
+	if err != nil {
+		return err
+	}
+
+	var exchs blockchain.Exchanges
+	for _, exch := range exchanges {
+		exchs = append(exchs, &blockchain.Exchange{
+			Address:     strings.ToLower(exch.account.GetAddress().String()),
+			Name:        exch.GetName(),
+			AccountType: "eoa",
+			Type:        "Exchange",
+		})
+	}
+
+	f, err := os.Create(cfg.ExchangesTable)
+	if err != nil {
+		return err
+	}
+
+	return gocsv.Marshal(exchs, f)
 }

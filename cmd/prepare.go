@@ -17,17 +17,17 @@ func prepareBlockchain(ctx context.Context) (*blockchain.Blockchain, error) {
 	)
 
 	err := di.FromContext(ctx).Invoke(func(c *config.Config) error {
-		err := parseCSV(c.BlocksTable, blocks)
+		err := parseCSV(c.BlocksTable, &blocks)
 		if err != nil {
 			return err
 		}
 
-		err = parseCSV(c.TransactionsTable, txs)
+		err = parseCSV(c.TransactionsTable, &txs)
 		if err != nil {
 			return err
 		}
 
-		return parseCSV(c.ExchangesTable, exchanges)
+		return parseCSV(c.ExchangesTable, &exchanges)
 	})
 	if err != nil {
 		return nil, err

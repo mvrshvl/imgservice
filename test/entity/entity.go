@@ -2,6 +2,7 @@ package entity
 
 import (
 	"context"
+	"fmt"
 	"github.com/ethereum/go-ethereum/common"
 	"log"
 	"nir/test/entity/account"
@@ -50,6 +51,8 @@ func AddEtherToEntity(ctx context.Context, entity Entity, amount int64) error {
 			if err != nil {
 				log.Fatal(err)
 			}
+
+			fmt.Println("SUCCESS TASK")
 		})
 		if err != nil {
 			return err
