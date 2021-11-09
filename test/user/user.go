@@ -2,7 +2,9 @@ package user
 
 import (
 	"context"
+	"fmt"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"math/rand"
 	"nir/test/entity/account"
 	"nir/test/exchange"
@@ -31,11 +33,12 @@ func CreateEntity(size uint64) (*User, error) {
 	return cluster, nil
 }
 
-func (ent *User) SendTransaction(ctx context.Context, exchange string, amount int64) (*common.Address, error) {
+func (ent *User) SendTransaction(ctx context.Context, exchange string, amount int64) (*types.LegacyTx, error) {
 	acc := ent.accounts[rand.Intn(len(ent.accounts))]
 	deposit := ent.deposits[exchange][rand.Intn(len(ent.deposits))]
 
-	return acc.SendTransaction(ctx, deposit, amount)
+	fmt.Println("TRANSFER", acc.GetAddress().String(), deposit.String())
+	return acc.SendTransaction(ctx, deposit, amount, false)
 }
 
 func (ent *User) CreateExchangeAccounts(exchange *exchange.Exchange) error {

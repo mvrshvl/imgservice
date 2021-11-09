@@ -20,8 +20,9 @@ type Config struct {
 }
 
 type Blockchain struct {
-	BlocksTable       string `default:"blockchain/blocks.csv"`
-	TransactionsTable string `default:"blockchain/transactions.csv"`
+	BlocksTable       string `default:"blockchain_data/blocks.csv"`
+	TransactionsTable string `default:"blockchain_data/transactions.csv"`
+	ExchangesTable    string `default:"blockchain_data/exchanges.csv"`
 }
 
 type Clustering struct {

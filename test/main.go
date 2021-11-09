@@ -4,10 +4,11 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/ethereum/go-ethereum/ethclient"
 	"log"
+	"math/rand"
 	"nir/test/entity"
 	"nir/test/exchange"
+	"nir/test/startbalance"
 	"nir/test/user"
 	"nir/test/writer"
 	"os/exec"
@@ -18,15 +19,16 @@ import (
 )
 
 func main() {
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	var (
-		wr  *ethclient.Client
+		wr  *writer.Writer
 		err error
 	)
 
 	for {
-		wr, err = writer.Connect(ctx, writerNode)
+		wr, err = writer.Connect(ctx, getWriterNodes())
 		if err != nil {
 			continue
 		}
@@ -35,8 +37,12 @@ func main() {
 	}
 
 	ctx = writer.WithWriter(ctx, wr)
+	ctx, err = startbalance.CommonBalancesWithCtx(ctx, getAccountsWithBalance())
+	if err != nil {
+		log.Fatal(err)
+	}
 
-	exchanges, err := createExchanges(countExchanges)
+	exchanges, err := createExchanges(ctx, countExchanges)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -53,11 +59,23 @@ func main() {
 
 	users := append(accounts, clusters...)
 
-	addEtherToEOAs(ctx, exchanges, users)
+	err = addEtherToEntities(ctx, exchanges, users)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Println("Start sending transactions...")
 
 	SendTransactions(ctx, users, exchanges, countTransactions)
 
-	currentBlock, err := wr.BlockNumber(ctx)
+	closeExchanges(exchanges)
+
+	var currentBlock uint64
+
+	err = writer.Execute(ctx, func(w *writer.Writer) (innerErr error) {
+		currentBlock, innerErr = w.BlockNumber(ctx)
+		return innerErr
+	})
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -78,36 +96,27 @@ func main() {
 	fmt.Println("Successful\n", stdout.String())
 }
 
-func addEtherToEOAs(ctx context.Context, exchanges []*exchange.Exchange, eoas []*user.User) {
+func addEtherToEntities(ctx context.Context, exchanges []*exchange.Exchange, users []*user.User) error {
 	var (
-		wg sync.WaitGroup
+		entities []entity.Entity
 	)
 
-	for _, acc := range eoas {
-		err := CreateExchangesAccounts(exchanges, acc)
+	for _, u := range users {
+		err := CreateExchangesAccounts(exchanges, u)
 		if err != nil {
-			log.Fatal(err)
+			return err
 		}
 
-		var ent entity.Entity
-
-		ent = acc
-
-		wg.Add(1)
-
-		go func() {
-			defer wg.Done()
-
-			err := entity.AddEtherToEntity(ctx, ent, commonAmount)
-			if err != nil {
-				log.Fatal(err)
-			}
-		}()
-
-		time.Sleep(time.Millisecond * 50)
+		entities = append(entities, u)
 	}
 
-	wg.Wait()
+	for _, e := range exchanges {
+		entities = append(entities, e)
+	}
+
+	entity.AddEtherToEntities(ctx, entities, commonAmount)
+
+	return nil
 }
 
 func createEOAs(count, size uint64) (clusters []*user.User, err error) {
@@ -123,11 +132,11 @@ func createEOAs(count, size uint64) (clusters []*user.User, err error) {
 	return clusters, nil
 }
 
-func createExchanges(count uint64) (exchanges []*exchange.Exchange, err error) {
+func createExchanges(ctx context.Context, count uint64) (exchanges []*exchange.Exchange, err error) {
 	exchanges = make([]*exchange.Exchange, count)
 
 	for i := uint64(0); i < count; i++ {
-		exchanges[i], err = exchange.CreateExchange()
+		exchanges[i], err = exchange.CreateExchange(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -164,24 +173,24 @@ func SendTransactions(ctx context.Context, entities []*user.User, exchanges []*e
 			go func() {
 				defer wg.Done()
 
+				amount := rand.Intn(100)
+
 				currentTxNumber := atomic.AddInt32(txsNumbers, 1)
 
 				currentEntity := entities[currentTxNumber%int32(len(entities))]
 				currentExchange := exchanges[currentTxNumber%int32(len(exchanges))]
 
-				deposit, err := currentEntity.SendTransaction(ctx, currentExchange.GetName(), 1)
+				now := time.Now()
+				tx, err := currentEntity.SendTransaction(ctx, currentExchange.GetName(), int64(amount))
 				if err != nil {
 					log.Printf("can't send %d tranasction: %v\n", currentTxNumber, err)
 
 					return
 				}
 
-				err = currentExchange.GetEthFromDeposit(ctx, deposit, 1)
-				if err != nil {
-					log.Printf("can't send %d tranasction from deposit: %v\n", currentTxNumber, err)
+				fmt.Println("SENDING TX TO DEPOSIT", time.Since(now))
 
-					return
-				}
+				currentExchange.AddIncomingTransaction(tx)
 			}()
 			if count == countTxs {
 				wg.Wait()
@@ -192,4 +201,21 @@ func SendTransactions(ctx context.Context, entities []*user.User, exchanges []*e
 
 		time.Sleep(time.Second)
 	}
+}
+
+func closeExchanges(exchanges []*exchange.Exchange) {
+	var wg sync.WaitGroup
+
+	for _, exch := range exchanges {
+		wg.Add(1)
+
+		exch := exch
+		go func() {
+			defer wg.Done()
+
+			exch.Close()
+		}()
+	}
+
+	wg.Wait()
 }

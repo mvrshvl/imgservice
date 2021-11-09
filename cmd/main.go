@@ -3,8 +3,8 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/sirupsen/logrus"
 	"log"
+	"nir/clustering/deposit"
 	"nir/config"
 	"nir/di"
 	logging "nir/log"
@@ -24,13 +24,19 @@ func main() {
 
 	ctx = di.WithContext(ctx, container)
 
-	test(ctx)
-}
+	chain, err := prepareBlockchain(ctx)
+	if err != nil {
+		log.Fatal(err)
+	}
 
-func test(ctx context.Context) error {
-	return di.FromContext(ctx).Invoke(func(l *logrus.Entry, c *config.Config) error {
-		l.Error(fmt.Sprintf("config %v", c))
+	var transfers []*deposit.ExchangeTransfer
 
-		return nil
+	err = di.FromContext(ctx).Invoke(func(c *config.Config) {
+		transfers = deposit.GetExchangeTransfers(chain, c.Clustering.MaxBlockDiff)
 	})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Println(transfers)
 }
