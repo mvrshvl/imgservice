@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"nir/clustering/transfer"
 	"nir/config"
@@ -29,14 +28,12 @@ func main() {
 		log.Fatal(err)
 	}
 
-	var transfers []*transfer.ExchangeTransfer
+	var ts []*transfer.ExchangeTransfer
 
 	err = di.FromContext(ctx).Invoke(func(c *config.Config) {
-		transfers = transfers.GetExchangeTransfers(chain, c.Clustering.MaxBlockDiff)
+		ts = transfer.GetExchangeTransfers(chain, c.Clustering.MaxBlockDiff)
 	})
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	fmt.Println(transfers)
 }

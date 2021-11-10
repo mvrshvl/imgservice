@@ -5,8 +5,8 @@ import (
 )
 
 type ExchangeTransfer struct {
-	txToExchange *blockchain.Transaction
-	txToDeposit  *blockchain.Transaction
+	TxToExchange *blockchain.Transaction
+	TxToDeposit  *blockchain.Transaction
 }
 
 func GetExchangeTransfers(chain *blockchain.Blockchain, blockDiff uint64) []*ExchangeTransfer {
@@ -27,8 +27,8 @@ func mergeTransactions(txsToExchange blockchain.Transactions, txsToDeposit block
 				txToExchange.Value == txToDeposit.Value && // is always equal?
 				blockDiff > 0 && blockDiff < maxBlockDiff {
 				exchangeTransfers = append(exchangeTransfers, &ExchangeTransfer{
-					txToExchange: txToExchange,
-					txToDeposit:  txToDeposit,
+					TxToExchange: txToExchange,
+					TxToDeposit:  txToDeposit,
 				})
 			}
 
