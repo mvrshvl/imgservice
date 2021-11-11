@@ -17,6 +17,7 @@ type Config struct {
 	Blockchain
 	Clustering
 	Log
+	Output
 }
 
 type Blockchain struct {
@@ -32,6 +33,10 @@ type Clustering struct {
 
 type Log struct {
 	Level logrus.Level
+}
+
+type Output struct {
+	GraphDepositsReuse string `default:"output/deposit_reuse.html"`
 }
 
 func New() (*Config, error) {

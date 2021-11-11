@@ -54,6 +54,10 @@ func main() {
 		log.Fatal(err)
 	}
 
+	for _, cluster := range clusters {
+		fmt.Println("CLUSTER ACCOUNTS", cluster.GetAccounts())
+	}
+
 	accounts, err := createEOAs(countAccounts-(countCluster*maxCountAccountsInCluster), 1)
 	if err != nil {
 		log.Fatal(err)
@@ -69,6 +73,8 @@ func main() {
 	fmt.Println("Start sending transactions...")
 
 	SendTransactions(ctx, users, exchanges, countTransactions)
+
+	fmt.Println("Closing exchanges...")
 
 	closeExchanges(exchanges)
 
@@ -203,6 +209,7 @@ func SendTransactions(ctx context.Context, entities []*user.User, exchanges []*e
 			}
 		}
 
+		fmt.Println("Transactions sent", atomic.LoadInt32(txsNumbers))
 		time.Sleep(time.Second)
 	}
 }

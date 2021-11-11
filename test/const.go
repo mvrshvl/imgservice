@@ -5,10 +5,10 @@ const (
 
 	countExchanges            = 1
 	countCluster              = 1
-	countAccounts             = 50
-	countTransactions         = 100
-	maxCountAccountsInCluster = 5
-	transactonsPerSecond      = 25
+	countAccounts             = 15
+	countTransactions         = 50
+	maxCountAccountsInCluster = 7
+	transactonsPerSecond      = 30
 )
 
 func getWriterNodes() []string {
