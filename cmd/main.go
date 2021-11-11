@@ -11,7 +11,6 @@ import (
 	"nir/clustering/transfer"
 	"nir/config"
 	"nir/di"
-	"nir/graph"
 	logging "nir/log"
 	"os"
 )
@@ -51,23 +50,21 @@ func main() {
 
 	clusters := depositreuse.Find(ts)
 
-	err = RenderGraph(chain.Exchanges, cfg.Output.GraphDepositsReuse, clusters)
+	err = RenderGraph(chain.Exchanges, cfg.Output.GraphDepositsReuse, clusters, cfg.ShowSingleAccount)
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	graph.GraphExamples{}.Examples()
 }
 
-func RenderGraph(exchanges blockchain.Exchanges, filepath string, clusters depositreuse.Clusters) error {
+func RenderGraph(exchanges blockchain.Exchanges, filepath string, clusters depositreuse.Clusters, showSingleAccounts bool) error {
 	exchangesNodes := make(map[string]opts.GraphNode)
 	for _, exch := range exchanges {
-		exchangesNodes[exch.Address] = opts.GraphNode{Name: exch.Name[0:6]}
+		exchangesNodes[exch.Address] = opts.GraphNode{Name: exch.Name}
 	}
 
 	page := components.NewPage()
 	page.AddCharts(
-		clusters.GenerateGraph(exchangesNodes),
+		clusters.GenerateGraph(exchangesNodes, showSingleAccounts),
 	)
 
 	f, err := os.Create(filepath)
