@@ -11,3 +11,6 @@ down:
 
 stop:
 	docker stop $(docker ps -a -q)
+
+gen-binding:
+	docker build -t bindings -f ./test/contract/generator/Dockerfile ./test/contract && docker run --privileged -v $(PWD)/test/contract:/contract bindings

@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"fmt"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -18,7 +19,7 @@ type Account struct {
 	nonce   uint64
 	key     *ecdsa.PrivateKey
 
-	mux sync.Mutex
+	mux sync.RWMutex
 }
 
 func CreateAccount() (*Account, error) {
@@ -92,6 +93,38 @@ func (acc *Account) SendTransaction(ctx context.Context, to *common.Address, amo
 
 func (acc *Account) GetAddress() *common.Address {
 	return acc.address
+}
+
+func (acc *Account) DeployContract(ctx context.Context, deployFunc func(auth *bind.TransactOpts, backend bind.ContractBackend) error) (contractAddr common.Address, err error) {
+	err = writer.Execute(ctx, func(w *writer.Writer) (innerErr error) {
+		gasPrice, innerErr := w.SuggestGasPrice(ctx)
+
+		auth, innerErr := bind.NewKeyedTransactorWithChainID(acc.key, big.NewInt(writer.ChainID))
+		if err != nil {
+			return err
+		}
+
+		acc.mux.Lock()
+		defer acc.mux.Unlock()
+
+		auth.Nonce = big.NewInt(int64(acc.nonce))
+		contractAddr = crypto.CreateAddress(*acc.address, acc.nonce)
+
+		auth.Value = big.NewInt(0)
+		auth.GasLimit = writer.GasLimit
+		auth.GasPrice = gasPrice
+
+		innerErr = w.DeployContract(auth, deployFunc)
+		if innerErr != nil {
+			return err
+		}
+
+		acc.nonce++
+
+		return nil
+	})
+
+	return
 }
 
 func NewAccountFromKey(key string) (*Account, error) {

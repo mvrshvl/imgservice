@@ -15,8 +15,8 @@ type User struct {
 	deposits map[string][]*common.Address
 }
 
-func CreateEntity(size uint64) (*User, error) {
-	cluster := &User{
+func CreateUserFromSize(size uint64) (*User, error) {
+	user := &User{
 		accounts: make([]*account.Account, size),
 		deposits: make(map[string][]*common.Address),
 	}
@@ -27,10 +27,10 @@ func CreateEntity(size uint64) (*User, error) {
 			return nil, err
 		}
 
-		cluster.accounts[i] = acc
+		user.accounts[i] = acc
 	}
 
-	return cluster, nil
+	return user, nil
 }
 
 func (ent *User) SendTransaction(ctx context.Context, exchange string, amount int64) (*types.LegacyTx, error) {

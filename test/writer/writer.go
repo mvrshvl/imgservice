@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -28,9 +29,13 @@ type Writer struct {
 
 func (w Writer) SendTransaction(ctx context.Context, tx *types.Transaction) error {
 	return w.executeAll(func(client *ethclient.Client) error {
-		err := client.SendTransaction(ctx, tx)
+		return client.SendTransaction(ctx, tx)
+	})
+}
 
-		return err
+func (w Writer) DeployContract(auth *bind.TransactOpts, deployFunc func(auth *bind.TransactOpts, backend bind.ContractBackend) error) error {
+	return w.executeAll(func(client *ethclient.Client) error {
+		return deployFunc(auth, client)
 	})
 }
 

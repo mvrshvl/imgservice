@@ -4,15 +4,22 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/common"
 	"log"
+	"math/big"
 	"math/rand"
+	"nir/test/contract"
 	"nir/test/entity"
+	"nir/test/entity/account"
 	"nir/test/exchange"
 	"nir/test/startbalance"
 	"nir/test/user"
 	"nir/test/writer"
 	"os/exec"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -69,6 +76,33 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	fmt.Println("Deploy contract...")
+	acc, err := account.CreateAccount()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = addEthToAccount(ctx, acc.GetAddress(), writer.GasLimit)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	addr, err := acc.DeployContract(ctx, func(auth *bind.TransactOpts, backend bind.ContractBackend) error {
+		inAddr, tx, _, innerErr := contract.DeploySimpleToken(auth, backend, "TestContract", "TC", big.NewInt(1000))
+		if innerErr != nil {
+			return innerErr
+		}
+
+		fmt.Println("CONTRACT DATA", inAddr.String(), tx.Hash())
+
+		return nil
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Println("OUT CONTRACT DATA", addr.String())
 
 	fmt.Println("Start sending transactions...")
 
@@ -136,7 +170,7 @@ func createEOAs(count, size uint64) (clusters []*user.User, err error) {
 	clusters = make([]*user.User, count)
 
 	for i := uint64(0); i < count; i++ {
-		clusters[i], err = user.CreateEntity(size)
+		clusters[i], err = user.CreateUserFromSize(size)
 		if err != nil {
 			return nil, err
 		}
@@ -229,4 +263,40 @@ func closeExchanges(exchanges []*exchange.Exchange) {
 	}
 
 	wg.Wait()
+}
+
+func bytecodeContract(bin, abiJSON string, args ...interface{}) ([]byte, error) {
+	bytecode := common.FromHex(bin)
+
+	ssAbi, err := abi.JSON(strings.NewReader(abiJSON))
+	if err != nil {
+		return nil, err
+	}
+
+	ssInput, err := ssAbi.Pack("", args...)
+	if err != nil {
+		return nil, err
+	}
+
+	return append(bytecode, ssInput...), nil
+}
+
+func addEthToAccount(ctx context.Context, acc *common.Address, amount int64) error {
+	waitCh := make(chan struct{})
+
+	err := startbalance.AddTask(ctx, func(a *account.Account) {
+		_, err := a.SendTransaction(ctx, acc, amount, true)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		close(waitCh)
+	})
+	if err != nil {
+		return err
+	}
+
+	<-waitCh
+
+	return nil
 }
