@@ -95,36 +95,55 @@ func (acc *Account) GetAddress() *common.Address {
 	return acc.address
 }
 
-func (acc *Account) DeployContract(ctx context.Context, deployFunc func(auth *bind.TransactOpts, backend bind.ContractBackend) error) (contractAddr common.Address, err error) {
-	err = writer.Execute(ctx, func(w *writer.Writer) (innerErr error) {
-		gasPrice, innerErr := w.SuggestGasPrice(ctx)
+func (acc *Account) DeployContract(ctx context.Context, gasLimit uint64, deployFunc func(auth *bind.TransactOpts, backend bind.ContractBackend) error) error {
+	err := acc.ExecuteContract(ctx, gasLimit, deployFunc)
+	if err != nil {
+		return err
+	}
 
-		auth, innerErr := bind.NewKeyedTransactorWithChainID(acc.key, big.NewInt(writer.ChainID))
-		if err != nil {
-			return err
-		}
+	acc.mux.Lock()
+	acc.nonce++
+	acc.mux.Unlock()
 
-		acc.mux.Lock()
-		defer acc.mux.Unlock()
+	return nil
+}
 
-		auth.Nonce = big.NewInt(int64(acc.nonce))
-		contractAddr = crypto.CreateAddress(*acc.address, acc.nonce)
-
-		auth.Value = big.NewInt(0)
-		auth.GasLimit = writer.GasLimit
-		auth.GasPrice = gasPrice
-
-		innerErr = w.DeployContract(auth, deployFunc)
+func (acc *Account) ExecuteContract(ctx context.Context, gasLimit uint64, fn func(auth *bind.TransactOpts, backend bind.ContractBackend) error) error {
+	return writer.Execute(ctx, func(w *writer.Writer) (innerErr error) {
+		auth, innerErr := acc.getAuth(ctx, gasLimit, w)
 		if innerErr != nil {
-			return err
+			return innerErr
 		}
 
-		acc.nonce++
+		innerErr = w.ExecuteContract(auth, fn)
+		if innerErr != nil {
+			return innerErr
+		}
 
 		return nil
 	})
+}
 
-	return
+func (acc *Account) getAuth(ctx context.Context, gasLimit uint64, w *writer.Writer) (*bind.TransactOpts, error) {
+	gasPrice, err := w.SuggestGasPrice(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	auth, err := bind.NewKeyedTransactorWithChainID(acc.key, big.NewInt(writer.ChainID))
+	if err != nil {
+		return nil, err
+	}
+
+	acc.mux.RLock()
+	auth.Nonce = big.NewInt(int64(acc.nonce))
+	acc.mux.RUnlock()
+
+	auth.Value = big.NewInt(0)
+	auth.GasLimit = gasLimit * 20
+	auth.GasPrice = gasPrice
+
+	return auth, nil
 }
 
 func NewAccountFromKey(key string) (*Account, error) {

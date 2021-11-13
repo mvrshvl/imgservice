@@ -89,8 +89,14 @@ func (cls Clusters) GenerateGraph(exchanges map[string]opts.GraphNode, showSingl
 	nodes := make([]opts.GraphNode, 0)
 	links := make([]opts.GraphLink, 0)
 
+	accountStyle := &opts.ItemStyle{Color: "#fc8452"}  //orange
+	depositStyle := &opts.ItemStyle{Color: "#f9e215"}  //yellow
+	clusterStyle := &opts.ItemStyle{Color: "#f92a13"}  //red
+	exchangeStyle := &opts.ItemStyle{Color: "#3ba272"} //green
+
 	isAdded := make(map[string]struct{})
 	for _, node := range exchanges {
+		node.ItemStyle = exchangeStyle
 		nodes = append(nodes, node)
 	}
 
@@ -99,7 +105,7 @@ func (cls Clusters) GenerateGraph(exchanges map[string]opts.GraphNode, showSingl
 			continue
 		}
 
-		clusterNode := opts.GraphNode{Name: fmt.Sprintf("cluster%d", numCluster)}
+		clusterNode := opts.GraphNode{Name: fmt.Sprintf("cluster%d", numCluster), ItemStyle: clusterStyle}
 		nodes = append(nodes, clusterNode)
 
 		for _, transfers := range cluster.Accounts {
@@ -115,13 +121,13 @@ func (cls Clusters) GenerateGraph(exchanges map[string]opts.GraphNode, showSingl
 				if _, ok := isAdded[account]; !ok {
 					isAdded[account] = struct{}{}
 
-					nodes = append(nodes, opts.GraphNode{Name: account})
+					nodes = append(nodes, opts.GraphNode{Name: account, ItemStyle: accountStyle})
 				}
 
 				if _, ok := isAdded[deposit]; !ok {
 					isAdded[deposit] = struct{}{}
 
-					nodes = append(nodes, opts.GraphNode{Name: deposit})
+					nodes = append(nodes, opts.GraphNode{Name: deposit, ItemStyle: depositStyle})
 				}
 
 				links = append(links, opts.GraphLink{Source: clusterNode.Name, Target: account})

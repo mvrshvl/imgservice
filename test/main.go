@@ -7,6 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"log"
 	"math/big"
 	"math/rand"
@@ -83,18 +84,44 @@ func main() {
 		log.Fatal(err)
 	}
 
-	err = addEthToAccount(ctx, acc.GetAddress(), writer.GasLimit)
+	err = addEthToAccount(ctx, acc.GetAddress(), commonAmount)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	addr, err := acc.DeployContract(ctx, func(auth *bind.TransactOpts, backend bind.ContractBackend) error {
-		inAddr, tx, _, innerErr := contract.DeploySimpleToken(auth, backend, "TestContract", "TC", big.NewInt(1000))
+	balance, err := wr.BalanceAt(ctx, *acc.GetAddress())
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	bytecode, err := bytecodeContract(contract.SimpleTokenBin, contract.SimpleTokenABI, "test", "t", big.NewInt(1000))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	estimate, err := wr.EstimateGas(ctx, *acc.GetAddress(), nil, bytecode)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Println("DEPLOYER BALANCE", balance, estimate)
+
+	var token *contract.SimpleToken
+
+	err = acc.DeployContract(ctx, estimate, func(auth *bind.TransactOpts, backend bind.ContractBackend) (innerErr error) {
+		var tx *types.Transaction
+
+		_, tx, token, innerErr = contract.DeploySimpleToken(auth, backend, "TestContract", "TC", big.NewInt(100))
 		if innerErr != nil {
+			fmt.Println("CONTRACT ERR", innerErr)
+
 			return innerErr
 		}
 
-		fmt.Println("CONTRACT DATA", inAddr.String(), tx.Hash())
+		err = wr.WaitTx(ctx, tx.Hash())
+		if err != nil {
+			log.Fatal(err)
+		}
 
 		return nil
 	})
@@ -102,7 +129,31 @@ func main() {
 		log.Fatal(err)
 	}
 
-	fmt.Println("OUT CONTRACT DATA", addr.String())
+	rndAcc, err := account.CreateAccount()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = acc.ExecuteContract(ctx, estimate, func(auth *bind.TransactOpts, backend bind.ContractBackend) error {
+		tx, innerErr := token.Transfer(auth, *rndAcc.GetAddress(), big.NewInt(100))
+		if innerErr != nil {
+			return innerErr
+		}
+
+		err = wr.WaitTx(ctx, tx.Hash())
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		b, innerErr := token.BalanceOf(nil, *rndAcc.GetAddress())
+		if innerErr != nil {
+			return innerErr
+		}
+
+		fmt.Println("BALANCE OF NEW ACC", b.Int64())
+
+		return nil
+	})
 
 	fmt.Println("Start sending transactions...")
 

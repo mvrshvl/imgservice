@@ -33,7 +33,7 @@ func (w Writer) SendTransaction(ctx context.Context, tx *types.Transaction) erro
 	})
 }
 
-func (w Writer) DeployContract(auth *bind.TransactOpts, deployFunc func(auth *bind.TransactOpts, backend bind.ContractBackend) error) error {
+func (w Writer) ExecuteContract(auth *bind.TransactOpts, deployFunc func(auth *bind.TransactOpts, backend bind.ContractBackend) error) error {
 	return w.executeAll(func(client *ethclient.Client) error {
 		return deployFunc(auth, client)
 	})
@@ -67,6 +67,31 @@ func (w Writer) SuggestGasPrice(ctx context.Context) (gasPrice *big.Int, err err
 	return gasPrice, err
 }
 
+func (w *Writer) EstimateGas(ctx context.Context, from common.Address, to *common.Address, data []byte) (estimate uint64, err error) {
+	err = w.executeAll(func(client *ethclient.Client) (innerErr error) {
+		gasPrice, innerErr := client.SuggestGasPrice(ctx)
+		if innerErr != nil {
+			return innerErr
+		}
+
+		estimate, innerErr = client.EstimateGas(ctx, ethereum.CallMsg{
+			From:       from,
+			To:         to,
+			Gas:        0,
+			GasPrice:   gasPrice,
+			GasFeeCap:  nil,
+			GasTipCap:  nil,
+			Value:      nil,
+			Data:       nil,
+			AccessList: nil,
+		})
+
+		return innerErr
+	})
+
+	return
+}
+
 func (w Writer) WaitTx(ctx context.Context, hash common.Hash) error {
 	return w.executeAll(func(client *ethclient.Client) error {
 		tick := time.NewTicker(time.Second)
@@ -77,7 +102,7 @@ func (w Writer) WaitTx(ctx context.Context, hash common.Hash) error {
 			case <-ctx.Done():
 				return fmt.Errorf("timeout")
 			default:
-				_, err := client.TransactionReceipt(ctx, hash)
+				receipt, err := client.TransactionReceipt(ctx, hash)
 				if err != nil {
 					if errors.Is(err, ethereum.NotFound) {
 						continue
@@ -86,6 +111,7 @@ func (w Writer) WaitTx(ctx context.Context, hash common.Hash) error {
 					return err
 				}
 
+				fmt.Println("receiptHash", receipt, receipt.Logs, receipt.Status)
 				return nil
 			}
 		}
