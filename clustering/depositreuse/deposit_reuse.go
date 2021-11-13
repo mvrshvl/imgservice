@@ -85,7 +85,7 @@ func Find(transfers []*transfer.ExchangeTransfer) Clusters {
 	return clusters
 }
 
-func (cls Clusters) GenerateGraph(exchanges map[string]opts.GraphNode) *charts.Graph {
+func (cls Clusters) GenerateGraph(exchanges map[string]opts.GraphNode, showSingleAccounts bool) *charts.Graph {
 	nodes := make([]opts.GraphNode, 0)
 	links := make([]opts.GraphLink, 0)
 
@@ -95,6 +95,10 @@ func (cls Clusters) GenerateGraph(exchanges map[string]opts.GraphNode) *charts.G
 	}
 
 	for numCluster, cluster := range cls {
+		if len(cluster.Accounts) == 1 && showSingleAccounts {
+			continue
+		}
+
 		clusterNode := opts.GraphNode{Name: fmt.Sprintf("cluster%d", numCluster)}
 		nodes = append(nodes, clusterNode)
 

@@ -36,6 +36,7 @@ type Log struct {
 }
 
 type Output struct {
+	ShowSingleAccount  bool   `default:"true"`
 	GraphDepositsReuse string `default:"output/deposit_reuse.html"`
 }
 

@@ -35,7 +35,7 @@ func CreateUserFromSize(size uint64) (*User, error) {
 
 func (ent *User) SendTransaction(ctx context.Context, exchange string, amount int64) (*types.LegacyTx, error) {
 	acc := ent.accounts[rand.Intn(len(ent.accounts))]
-	deposit := ent.deposits[exchange][rand.Intn(len(ent.deposits))]
+	deposit := ent.deposits[exchange][rand.Intn(len(ent.deposits[exchange]))]
 
 	fmt.Println("TRANSFER", acc.GetAddress().String(), deposit.String())
 	return acc.SendTransaction(ctx, deposit, amount, false)
