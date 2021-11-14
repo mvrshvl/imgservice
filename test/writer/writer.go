@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/rpc"
 	"math/big"
+	"math/rand"
 	"nir/amlerror"
 	"sync"
 	"time"
@@ -33,14 +34,18 @@ func (w Writer) SendTransaction(ctx context.Context, tx *types.Transaction) erro
 	})
 }
 
-func (w Writer) ExecuteContract(auth *bind.TransactOpts, deployFunc func(auth *bind.TransactOpts, backend bind.ContractBackend) error) error {
-	return w.executeAll(func(client *ethclient.Client) error {
-		return deployFunc(auth, client)
+func (w Writer) ExecuteContract(auth *bind.TransactOpts, deployFunc func(auth *bind.TransactOpts, backend bind.ContractBackend) (*types.Transaction, error)) (tx *types.Transaction, err error) {
+	err = w.executeOne(func(client *ethclient.Client) (innerErr error) {
+		tx, innerErr = deployFunc(auth, client)
+
+		return innerErr
 	})
+
+	return tx, err
 }
 
 func (w Writer) BalanceAt(ctx context.Context, addr common.Address) (balance *big.Int, err error) {
-	err = w.executeAll(func(client *ethclient.Client) (innerErr error) {
+	err = w.executeOne(func(client *ethclient.Client) (innerErr error) {
 		balance, innerErr = client.BalanceAt(ctx, addr, nil)
 		return innerErr
 	})
@@ -49,7 +54,7 @@ func (w Writer) BalanceAt(ctx context.Context, addr common.Address) (balance *bi
 }
 
 func (w Writer) BlockNumber(ctx context.Context) (number uint64, err error) {
-	err = w.executeAll(func(client *ethclient.Client) (innerErr error) {
+	err = w.executeOne(func(client *ethclient.Client) (innerErr error) {
 		number, innerErr = client.BlockNumber(ctx)
 		return innerErr
 	})
@@ -58,7 +63,7 @@ func (w Writer) BlockNumber(ctx context.Context) (number uint64, err error) {
 }
 
 func (w Writer) SuggestGasPrice(ctx context.Context) (gasPrice *big.Int, err error) {
-	err = w.executeAll(func(client *ethclient.Client) (innerErr error) {
+	err = w.executeOne(func(client *ethclient.Client) (innerErr error) {
 		gasPrice, innerErr = client.SuggestGasPrice(ctx)
 
 		return innerErr
@@ -68,7 +73,7 @@ func (w Writer) SuggestGasPrice(ctx context.Context) (gasPrice *big.Int, err err
 }
 
 func (w *Writer) EstimateGas(ctx context.Context, from common.Address, to *common.Address, data []byte) (estimate uint64, err error) {
-	err = w.executeAll(func(client *ethclient.Client) (innerErr error) {
+	err = w.executeOne(func(client *ethclient.Client) (innerErr error) {
 		gasPrice, innerErr := client.SuggestGasPrice(ctx)
 		if innerErr != nil {
 			return innerErr
@@ -102,7 +107,7 @@ func (w Writer) WaitTx(ctx context.Context, hash common.Hash) error {
 			case <-ctx.Done():
 				return fmt.Errorf("timeout")
 			default:
-				receipt, err := client.TransactionReceipt(ctx, hash)
+				_, err := client.TransactionReceipt(ctx, hash)
 				if err != nil {
 					if errors.Is(err, ethereum.NotFound) {
 						continue
@@ -111,7 +116,7 @@ func (w Writer) WaitTx(ctx context.Context, hash common.Hash) error {
 					return err
 				}
 
-				fmt.Println("receiptHash", receipt, receipt.Logs, receipt.Status)
+				//fmt.Println("receiptHash", receipt, receipt.Logs, receipt.Status)
 				return nil
 			}
 		}
@@ -147,6 +152,10 @@ func (w Writer) executeAll(fn func(client *ethclient.Client) error) error {
 	}
 
 	return nil
+}
+
+func (w Writer) executeOne(fn func(client *ethclient.Client) error) error {
+	return fn(w.connects[rand.Intn(len(w.connects)-1)])
 }
 
 func Connect(ctx context.Context, addresses []string) (*Writer, error) {

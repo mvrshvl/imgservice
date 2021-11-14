@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -20,178 +19,41 @@ import (
 	"nir/test/writer"
 	"os/exec"
 	"strconv"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 )
 
 func main() {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, closeDeps := prepareDeps(context.Background())
+	defer closeDeps()
+
+	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	var (
-		wr  *writer.Writer
-		err error
-	)
+	log.Println("Creating entities...")
+	users, exchanges, err := createEntitiesWithEther(ctx)
 
-	for {
-		wr, err = writer.Connect(ctx, getWriterNodes())
-		if err != nil {
-			continue
-		}
+	log.Println("Start airdrop...")
 
-		break
-	}
-
-	ctx = writer.WithWriter(ctx, wr)
-	ctx, err = startbalance.CommonBalancesWithCtx(ctx, getAccountsWithBalance())
+	err = airdrop(ctx, users)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	defer startbalance.Close(ctx)
+	log.Println("Start sending transactions to exchange...")
 
-	exchanges, err := createExchanges(ctx, countExchanges)
-	if err != nil {
-		log.Fatal(err)
-	}
+	sendTransactionsToExchange(ctx, users, exchanges, countTransactions)
 
-	clusters, err := createEOAs(countCluster, maxCountAccountsInCluster)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	for _, cluster := range clusters {
-		fmt.Println("CLUSTER ACCOUNTS", cluster.GetAccounts())
-	}
-
-	accounts, err := createEOAs(countAccounts-(countCluster*maxCountAccountsInCluster), 1)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	users := append(accounts, clusters...)
-
-	err = addEtherToEntities(ctx, exchanges, users)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	fmt.Println("Deploy contract...")
-	acc, err := account.CreateAccount()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	err = addEthToAccount(ctx, acc.GetAddress(), commonAmount)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	balance, err := wr.BalanceAt(ctx, *acc.GetAddress())
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	bytecode, err := bytecodeContract(contract.SimpleTokenBin, contract.SimpleTokenABI, "test", "t", big.NewInt(1000))
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	estimate, err := wr.EstimateGas(ctx, *acc.GetAddress(), nil, bytecode)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	fmt.Println("DEPLOYER BALANCE", balance, estimate)
-
-	var token *contract.SimpleToken
-
-	err = acc.DeployContract(ctx, estimate, func(auth *bind.TransactOpts, backend bind.ContractBackend) (innerErr error) {
-		var tx *types.Transaction
-
-		_, tx, token, innerErr = contract.DeploySimpleToken(auth, backend, "TestContract", "TC", big.NewInt(100))
-		if innerErr != nil {
-			fmt.Println("CONTRACT ERR", innerErr)
-
-			return innerErr
-		}
-
-		err = wr.WaitTx(ctx, tx.Hash())
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		return nil
-	})
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	rndAcc, err := account.CreateAccount()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	err = acc.ExecuteContract(ctx, estimate, func(auth *bind.TransactOpts, backend bind.ContractBackend) error {
-		tx, innerErr := token.Transfer(auth, *rndAcc.GetAddress(), big.NewInt(100))
-		if innerErr != nil {
-			return innerErr
-		}
-
-		err = wr.WaitTx(ctx, tx.Hash())
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		b, innerErr := token.BalanceOf(nil, *rndAcc.GetAddress())
-		if innerErr != nil {
-			return innerErr
-		}
-
-		fmt.Println("BALANCE OF NEW ACC", b.Int64())
-
-		return nil
-	})
-
-	fmt.Println("Start sending transactions...")
-
-	SendTransactions(ctx, users, exchanges, countTransactions)
-
-	fmt.Println("Closing exchanges...")
+	log.Println("Closing exchanges...")
 
 	closeExchanges(exchanges)
 
-	var currentBlock uint64
-
-	err = writer.Execute(ctx, func(w *writer.Writer) (innerErr error) {
-		currentBlock, innerErr = w.BlockNumber(ctx)
-		return innerErr
-	})
+	log.Println("Saving blockchain...")
+	err = saveBlockchain(ctx, exchanges)
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	cmd := exec.Command("bash", "./test/download_chain/download.sh", strconv.FormatUint(currentBlock, 10))
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	var stderr, stdout bytes.Buffer
-	cmd.Stderr = &stderr
-	cmd.Stdout = &stdout
-
-	if err = cmd.Run(); err != nil {
-		log.Fatal(err, "output", stderr.String())
-	}
-
-	err = exchange.SaveExchanges(exchanges)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	fmt.Println("Successful\n", stdout.String())
 }
 
 func addEtherToEntities(ctx context.Context, exchanges []*exchange.Exchange, users []*user.User) error {
@@ -254,7 +116,7 @@ func CreateExchangesAccounts(exchanges []*exchange.Exchange, entity *user.User) 
 	return nil
 }
 
-func SendTransactions(ctx context.Context, entities []*user.User, exchanges []*exchange.Exchange, countTxs int32) {
+func sendTransactionsToExchange(ctx context.Context, entities []*user.User, exchanges []*exchange.Exchange, countTxs int32) {
 	var (
 		count int32
 		wg    sync.WaitGroup
@@ -294,7 +156,7 @@ func SendTransactions(ctx context.Context, entities []*user.User, exchanges []*e
 			}
 		}
 
-		fmt.Println("Transactions sent", atomic.LoadInt32(txsNumbers))
+		log.Println("Transactions sent", atomic.LoadInt32(txsNumbers))
 		time.Sleep(time.Second)
 	}
 }
@@ -316,22 +178,6 @@ func closeExchanges(exchanges []*exchange.Exchange) {
 	wg.Wait()
 }
 
-func bytecodeContract(bin, abiJSON string, args ...interface{}) ([]byte, error) {
-	bytecode := common.FromHex(bin)
-
-	ssAbi, err := abi.JSON(strings.NewReader(abiJSON))
-	if err != nil {
-		return nil, err
-	}
-
-	ssInput, err := ssAbi.Pack("", args...)
-	if err != nil {
-		return nil, err
-	}
-
-	return append(bytecode, ssInput...), nil
-}
-
 func addEthToAccount(ctx context.Context, acc *common.Address, amount int64) error {
 	waitCh := make(chan struct{})
 
@@ -350,4 +196,192 @@ func addEthToAccount(ctx context.Context, acc *common.Address, amount int64) err
 	<-waitCh
 
 	return nil
+}
+
+func createUsers() []*user.User {
+	clustersDepositReuse, err := createEOAs(countCluster, maxCountAccountsInCluster)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	for _, cluster := range clustersDepositReuse {
+		fmt.Println("CLUSTER ACCOUNTS", cluster.GetAccounts())
+	}
+
+	accounts, err := createEOAs(countAccounts-(countCluster*maxCountAccountsInCluster), 1)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return append(accounts, clustersDepositReuse...)
+}
+
+func prepareDeps(ctx context.Context) (context.Context, func()) {
+	var (
+		wr  *writer.Writer
+		err error
+	)
+
+	for {
+		wr, err = writer.Connect(ctx, getWriterNodes())
+		if err != nil {
+			continue
+		}
+
+		break
+	}
+
+	ctx = writer.WithWriter(ctx, wr)
+	ctx, err = startbalance.CommonBalancesWithCtx(ctx, getAccountsWithBalance())
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return ctx, func() {
+		startbalance.Close(ctx)
+	}
+}
+
+func deployContract(ctx context.Context, distributor *account.Account, tokens int) (*contract.SimpleToken, error) {
+	bytecode, err := contract.BytecodeContract(contract.SimpleTokenBin, contract.SimpleTokenABI, "test", "t", big.NewInt(int64(tokens)))
+	if err != nil {
+		return nil, err
+	}
+
+	var gas uint64
+
+	err = writer.Execute(ctx, func(w *writer.Writer) (innerErr error) {
+		gas, innerErr = w.EstimateGas(ctx, *distributor.GetAddress(), nil, bytecode)
+
+		return innerErr
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	var token *contract.SimpleToken
+
+	tx, err := distributor.ExecuteContract(ctx, gas, func(auth *bind.TransactOpts, backend bind.ContractBackend) (tx *types.Transaction, innerErr error) {
+		_, tx, token, innerErr = contract.DeploySimpleToken(auth, backend, "TestContract", "TC", big.NewInt(int64(tokens)))
+
+		return tx, innerErr
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	err = writer.Execute(ctx, func(w *writer.Writer) error {
+		return w.WaitTx(ctx, tx.Hash())
+	})
+
+	return token, err
+}
+
+func airdrop(ctx context.Context, users []*user.User) error {
+	distributor, err := account.CreateAccount()
+	if err != nil {
+		return err
+	}
+
+	err = addEthToAccount(ctx, distributor.GetAddress(), commonAmount)
+	if err != nil {
+		return err
+	}
+
+	tokenContract, err := deployContract(ctx, distributor, countAccounts)
+	if err != nil {
+		return err
+	}
+
+	err = transferTokensToUsers(ctx, users, tokenContract, distributor, big.NewInt(1))
+	if err != nil {
+		return err
+	}
+
+	for _, u := range users {
+		err := u.CollectTokenOnOneAcc(ctx, mixTokensDepth, func(address *common.Address) (*big.Int, error) {
+			return tokenContract.BalanceOf(nil, *address)
+		}, func(ctx context.Context, from *account.Account, toAddr *common.Address, amount *big.Int) (innerErr error) {
+			return transferToken(ctx, tokenContract, from, toAddr, amount)
+		})
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func transferTokensToUsers(ctx context.Context, users []*user.User, tokenContract *contract.SimpleToken, distributor *account.Account, tokens *big.Int) error {
+	for _, u := range users {
+		for _, acc := range u.GetAccounts() {
+			err := transferToken(ctx, tokenContract, distributor, acc, tokens)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+func transferToken(ctx context.Context, tokenContract *contract.SimpleToken, distributor *account.Account, toAddr *common.Address, tokens *big.Int) error {
+	gas, err := contract.EstimateTransfer(ctx, *distributor.GetAddress(), toAddr, tokens)
+	if err != nil {
+		return err
+	}
+
+	tx, err := distributor.ExecuteContract(ctx, gas, func(auth *bind.TransactOpts, backend bind.ContractBackend) (*types.Transaction, error) {
+		return tokenContract.Transfer(auth, *toAddr, tokens)
+	})
+	if err != nil {
+		return err
+	}
+
+	return writer.Execute(ctx, func(w *writer.Writer) (innerErr error) {
+		return w.WaitTx(ctx, tx.Hash())
+	})
+}
+
+func saveBlockchain(ctx context.Context, exchanges []*exchange.Exchange) error {
+	var currentBlock uint64
+
+	err := writer.Execute(ctx, func(w *writer.Writer) (innerErr error) {
+		currentBlock, innerErr = w.BlockNumber(ctx)
+		return innerErr
+	})
+	if err != nil {
+		return err
+	}
+
+	cmd := exec.Command("bash", "./test/download_chain/download.sh", strconv.FormatUint(currentBlock, 10))
+	if err != nil {
+		return err
+	}
+
+	var stderr, stdout bytes.Buffer
+	cmd.Stderr = &stderr
+	cmd.Stdout = &stdout
+
+	if err = cmd.Run(); err != nil {
+		return fmt.Errorf("%w: stderr = %q, stdout = %q", err, stderr.String(), stdout.String())
+	}
+
+	return exchange.SaveExchanges(exchanges)
+}
+
+func createEntitiesWithEther(ctx context.Context) ([]*user.User, []*exchange.Exchange, error) {
+	users := createUsers()
+
+	exchanges, err := createExchanges(ctx, countExchanges)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	err = addEtherToEntities(ctx, exchanges, users)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return users, exchanges, nil
 }

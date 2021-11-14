@@ -9,6 +9,7 @@ const (
 	countTransactions         = 50
 	maxCountAccountsInCluster = 4
 	transactonsPerSecond      = 30
+	mixTokensDepth            = 4
 )
 
 func getWriterNodes() []string {

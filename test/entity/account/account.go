@@ -95,33 +95,26 @@ func (acc *Account) GetAddress() *common.Address {
 	return acc.address
 }
 
-func (acc *Account) DeployContract(ctx context.Context, gasLimit uint64, deployFunc func(auth *bind.TransactOpts, backend bind.ContractBackend) error) error {
-	err := acc.ExecuteContract(ctx, gasLimit, deployFunc)
-	if err != nil {
-		return err
-	}
-
-	acc.mux.Lock()
-	acc.nonce++
-	acc.mux.Unlock()
-
-	return nil
-}
-
-func (acc *Account) ExecuteContract(ctx context.Context, gasLimit uint64, fn func(auth *bind.TransactOpts, backend bind.ContractBackend) error) error {
-	return writer.Execute(ctx, func(w *writer.Writer) (innerErr error) {
+func (acc *Account) ExecuteContract(ctx context.Context, gasLimit uint64, fn func(auth *bind.TransactOpts, backend bind.ContractBackend) (*types.Transaction, error)) (tx *types.Transaction, err error) {
+	err = writer.Execute(ctx, func(w *writer.Writer) (innerErr error) {
 		auth, innerErr := acc.getAuth(ctx, gasLimit, w)
 		if innerErr != nil {
 			return innerErr
 		}
 
-		innerErr = w.ExecuteContract(auth, fn)
+		tx, innerErr = w.ExecuteContract(auth, fn)
 		if innerErr != nil {
 			return innerErr
 		}
 
 		return nil
 	})
+
+	acc.mux.Lock()
+	acc.nonce++
+	acc.mux.Unlock()
+
+	return tx, err
 }
 
 func (acc *Account) getAuth(ctx context.Context, gasLimit uint64, w *writer.Writer) (*bind.TransactOpts, error) {
@@ -157,4 +150,27 @@ func NewAccountFromKey(key string) (*Account, error) {
 		nonce:   0,
 		key:     privateKey,
 	}, nil
+}
+
+func WaitBalance(ctx context.Context, neededBalance uint64, address common.Address) error {
+	tick := time.NewTicker(time.Second)
+	defer tick.Stop()
+
+	var balance *big.Int
+
+	for range tick.C {
+		err := writer.Execute(ctx, func(w *writer.Writer) (innerErr error) {
+			balance, innerErr = w.BalanceAt(ctx, address)
+			return innerErr
+		})
+		if err != nil {
+			return err
+		}
+
+		if balance.Uint64() >= neededBalance {
+			break
+		}
+	}
+
+	return nil
 }

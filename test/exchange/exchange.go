@@ -8,14 +8,12 @@ import (
 	"github.com/gocarina/gocsv"
 	"github.com/google/uuid"
 	"log"
-	"math/big"
 	"nir/clustering/blockchain"
 	"nir/config"
 	"nir/test/entity/account"
 	"nir/test/writer"
 	"os"
 	"strings"
-	"time"
 )
 
 type Exchange struct {
@@ -114,7 +112,7 @@ func (exch *Exchange) GetEthFromDeposit(ctx context.Context, tx *types.LegacyTx)
 			return err
 		}
 
-		err = waitBalance(ctx, tx.Gas*tx.GasPrice.Uint64()+tx.Value.Uint64(), *tx.To)
+		err = account.WaitBalance(ctx, tx.Gas*tx.GasPrice.Uint64()+tx.Value.Uint64(), *tx.To)
 		if err != nil {
 			return err
 		}
@@ -132,29 +130,6 @@ func (exch *Exchange) GetEthFromDeposit(ctx context.Context, tx *types.LegacyTx)
 
 func (exch *Exchange) GetAccounts() (addresses []*common.Address) {
 	return []*common.Address{exch.account.GetAddress()}
-}
-
-func waitBalance(ctx context.Context, neededBalance uint64, address common.Address) error {
-	tick := time.NewTicker(time.Second)
-	defer tick.Stop()
-
-	var balance *big.Int
-
-	for range tick.C {
-		err := writer.Execute(ctx, func(w *writer.Writer) (innerErr error) {
-			balance, innerErr = w.BalanceAt(ctx, address)
-			return innerErr
-		})
-		if err != nil {
-			return err
-		}
-
-		if balance.Uint64() >= neededBalance {
-			break
-		}
-	}
-
-	return nil
 }
 
 func SaveExchanges(exchanges []*Exchange) error {
