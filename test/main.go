@@ -259,10 +259,24 @@ func deployContract(ctx context.Context, distributor *account.Account, tokens in
 		return nil, err
 	}
 
+	err = writer.Execute(ctx, func(w *writer.Writer) error {
+		b, innerErr := w.BalanceAt(ctx, *distributor.GetAddress())
+		if innerErr != nil {
+			return innerErr
+		}
+
+		fmt.Println("Distributor balance before deploy", b.Int64())
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
 	var token *contract.SimpleToken
 
 	tx, err := distributor.ExecuteContract(ctx, gas, func(auth *bind.TransactOpts, backend bind.ContractBackend) (tx *types.Transaction, innerErr error) {
-		_, tx, token, innerErr = contract.DeploySimpleToken(auth, backend, "TestContract", "TC", big.NewInt(int64(tokens)))
+		_, tx, token, innerErr = contract.DeploySimpleToken(auth, backend, "TestContract", "TC", big.NewInt(100000000000))
 
 		return tx, innerErr
 	})
@@ -273,6 +287,20 @@ func deployContract(ctx context.Context, distributor *account.Account, tokens in
 	err = writer.Execute(ctx, func(w *writer.Writer) error {
 		return w.WaitTx(ctx, tx.Hash())
 	})
+
+	err = writer.Execute(ctx, func(w *writer.Writer) error {
+		b, innerErr := w.BalanceAt(ctx, *distributor.GetAddress())
+		if innerErr != nil {
+			return innerErr
+		}
+
+		fmt.Println("Distributor balance after deploy", b.Int64(), "tx hash", tx.Hash().String())
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
 
 	return token, err
 }

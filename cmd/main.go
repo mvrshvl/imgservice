@@ -6,6 +6,8 @@ import (
 	"github.com/go-echarts/go-echarts/v2/opts"
 	"io"
 	"log"
+	"nir/clustering"
+	"nir/clustering/airdrop"
 	"nir/clustering/blockchain"
 	"nir/clustering/depositreuse"
 	"nir/clustering/transfer"
@@ -54,9 +56,11 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	airdrop.Find(chain.TokenTransfers)
 }
 
-func RenderGraph(exchanges blockchain.Exchanges, filepath string, clusters depositreuse.Clusters, showSingleAccounts bool) error {
+func RenderGraph(exchanges blockchain.Exchanges, filepath string, clusters clustering.Clusters, showSingleAccounts bool) error {
 	exchangesNodes := make(map[string]opts.GraphNode)
 	for _, exch := range exchanges {
 		exchangesNodes[exch.Address] = opts.GraphNode{Name: exch.Name}

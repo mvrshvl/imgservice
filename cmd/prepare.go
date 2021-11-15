@@ -11,9 +11,10 @@ import (
 
 func prepareBlockchain(ctx context.Context) (*blockchain.Blockchain, error) {
 	var (
-		blocks    []*blockchain.Block
-		txs       []*blockchain.Transaction
-		exchanges []*blockchain.Exchange
+		blocks         []*blockchain.Block
+		txs            []*blockchain.Transaction
+		exchanges      []*blockchain.Exchange
+		tokenTransfers blockchain.TokenTransfers
 	)
 
 	err := di.FromContext(ctx).Invoke(func(c *config.Config) error {
@@ -27,13 +28,18 @@ func prepareBlockchain(ctx context.Context) (*blockchain.Blockchain, error) {
 			return err
 		}
 
-		return parseCSV(c.ExchangesTable, &exchanges)
+		err = parseCSV(c.ExchangesTable, &exchanges)
+		if err != nil {
+			return err
+		}
+
+		return parseCSV(c.TokenTransfersTable, &tokenTransfers)
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	return blockchain.New(txs, blocks, exchanges), nil
+	return blockchain.New(txs, blocks, exchanges, tokenTransfers), nil
 }
 
 func parseCSV(filename string, out interface{}) error {
