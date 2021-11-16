@@ -55,7 +55,7 @@ func HasAnAccounts(cluster *clustering.Cluster, accs map[string][]*transfer.Exch
 	return false
 }
 
-// MergeMatchesExchangeTransfersAccounts Добавляет в кластер А транзакции кластера Б, если хотя бы один аккаунт кластера Б существуют в кластере А
+// MergeMatchesExchangeTransfersAccounts Добавляет в кластер А транзакции кластера Б, если хотя бы одна транзакция к Exchange от одного аккаунта кластера Б существуют в кластере А
 func MergeMatchesExchangeTransfersAccounts(cluster *clustering.Cluster, currentDeposit string, depositsWithSenders map[string]*clustering.Cluster) { // todo rewrite this
 	for deposit, c := range depositsWithSenders {
 		if !HasAnAccounts(cluster, c.AccountsExchangeTransfers) || currentDeposit == deposit {
