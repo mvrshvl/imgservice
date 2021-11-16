@@ -7,7 +7,6 @@ import (
 	"io"
 	"log"
 	"nir/clustering"
-	"nir/clustering/airdrop"
 	"nir/clustering/blockchain"
 	"nir/clustering/depositreuse"
 	"nir/clustering/transfer"
@@ -57,7 +56,15 @@ func main() {
 		log.Fatal(err)
 	}
 
-	airdrop.Find(chain.TokenTransfers)
+	//airdropClusters, err := airdrop.Find(chain.TokenTransfers)
+	//if err != nil {
+	//	log.Fatal(err)
+	//}
+
+	err = RenderGraph(chain.Exchanges, cfg.Output.GraphDepositsReuse, clusters, cfg.ShowSingleAccount)
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
 func RenderGraph(exchanges blockchain.Exchanges, filepath string, clusters clustering.Clusters, showSingleAccounts bool) error {

@@ -8,6 +8,7 @@ import (
 )
 
 type Cluster struct {
+	Accounts                  map[string]struct{}
 	AccountsExchangeTransfers map[string][]*transfer.ExchangeTransfer
 	AccountsTokenTransfers    map[string][]*transfer.TokenTransfer
 }
@@ -15,47 +16,7 @@ type Cluster struct {
 type Clusters []*Cluster
 
 func NewCluster() *Cluster {
-	return &Cluster{AccountsExchangeTransfers: make(map[string][]*transfer.ExchangeTransfer), AccountsTokenTransfers: make(map[string][]*transfer.TokenTransfer)}
-}
-
-func (cl *Cluster) AddTransfer(transfer *transfer.ExchangeTransfer) {
-	for _, ts := range cl.AccountsExchangeTransfers[transfer.TxToDeposit.FromAddress] {
-		if ts.TxToDeposit.Hash == transfer.TxToDeposit.Hash {
-			return
-		}
-	}
-
-	cl.AccountsExchangeTransfers[transfer.TxToDeposit.FromAddress] = append(cl.AccountsExchangeTransfers[transfer.TxToDeposit.FromAddress], transfer)
-}
-
-func (cl *Cluster) AddTransfers(transfers []*transfer.ExchangeTransfer) {
-	for _, t := range transfers {
-		cl.AddTransfer(t)
-	}
-}
-
-func (cl *Cluster) HasAnAccounts(accs map[string][]*transfer.ExchangeTransfer) bool {
-	for acc := range accs {
-		if _, ok := cl.AccountsExchangeTransfers[acc]; ok {
-			return true
-		}
-	}
-
-	return false
-}
-
-func (cl *Cluster) MergeMatches(currentDeposit string, depositsWithSenders map[string]*Cluster) {
-	for deposit, cluster := range depositsWithSenders {
-		if !cl.HasAnAccounts(cluster.AccountsExchangeTransfers) || currentDeposit == deposit {
-			continue
-		}
-
-		for _, transfers := range cluster.AccountsExchangeTransfers {
-			cl.AddTransfers(transfers)
-		}
-
-		delete(depositsWithSenders, deposit)
-	}
+	return &Cluster{Accounts: make(map[string]struct{}), AccountsExchangeTransfers: make(map[string][]*transfer.ExchangeTransfer), AccountsTokenTransfers: make(map[string][]*transfer.TokenTransfer)}
 }
 
 func (cls Clusters) GenerateGraph(exchanges map[string]opts.GraphNode, showSingleAccounts bool) *charts.Graph {

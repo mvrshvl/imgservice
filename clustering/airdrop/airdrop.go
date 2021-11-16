@@ -1,15 +1,19 @@
 package airdrop
 
 import (
+	"nir/amlerror"
 	"nir/clustering"
 	"nir/clustering/blockchain"
 	"nir/clustering/transfer"
 )
 
-const address0 = "0x0000000000000000000000000000000000000000"
+const (
+	address0            = "0x0000000000000000000000000000000000000000"
+	errRecursiveCounter = amlerror.AMLError("Recursion exceeded the allowed rate")
+)
 
 //todo сделать для нескольких токенов
-func Find(tokenTransfers blockchain.TokenTransfers) (clusters clustering.Clusters) {
+func Find(tokenTransfers blockchain.TokenTransfers) (clusters clustering.Clusters, err error) {
 	owner := getOwner(tokenTransfers)
 
 	ownerTransfers := getAccountsByTransfers(tokenTransfers, owner)
@@ -21,58 +25,52 @@ func Find(tokenTransfers blockchain.TokenTransfers) (clusters clustering.Cluster
 
 		AddTransfersToCluster(cluster, sources)
 
-		search(accountsTransfers, target, sources, cluster)
+		err = search(0, accountsTransfers, target, sources, cluster)
+		if err != nil {
+			return nil, err
+		}
 
-		//for source := range sources {
-		//	if source == target {
-		//		continue
-		//	}
-		//
-		//	copySources, ok := accountsTransfers[source]
-		//	if !ok{
-		//		continue
-		//	}
-		//
-		//	for sourceCopySources, transferCopySources := range copySources {
-		//		AddTransferToClusterAccount(cluster, source, transferCopySources)
-		//
-		//		accountsTransfers[target][sourceCopySources] = transferCopySources
-		//	}
-		//
-		//	delete(accountsTransfers, source)
-		//}
-
-		if len(cluster.AccountsExchangeTransfers) >= 2 {
+		if len(cluster.AccountsTokenTransfers) >= 2 {
 			clusters = append(clusters, cluster)
 		}
 
 	}
 
-	return clusters
+	for _, ts := range accountsTransfers {
+		cluster := clustering.NewCluster()
+		AddTransfersToCluster(cluster, ts)
+
+		clusters = append(clusters, cluster)
+	}
+
+	return
 }
 
-func search(accountsTransfers map[string]map[string]*blockchain.TokenTransfer, target string, sources map[string]*blockchain.TokenTransfer, cluster *clustering.Cluster) {
-	for source := range sources {
-		if source == target {
-			continue
-		}
+func search(counter uint64, accountsTransfers map[string]map[string]*blockchain.TokenTransfer, target string, sources map[string]*blockchain.TokenTransfer, cluster *clustering.Cluster) error {
+	if counter == 100000 {
+		return errRecursiveCounter
+	}
 
+	for source := range sources {
 		copySources, ok := accountsTransfers[source]
 		if !ok {
 			continue
 		}
 
 		AddTransfersToCluster(cluster, copySources)
-		search(accountsTransfers, source, copySources, cluster)
-		//for sourceCopySources, transferCopySources := range copySources {
-		//	AddTransferToClusterAccount(cluster, source, transferCopySources)
-		//
-		//	accountsTransfers[target][sourceCopySources] = transferCopySources
-		//}
 
+		delete(accountsTransfers, target)
 		delete(accountsTransfers, source)
+
+		err := search(counter+1, accountsTransfers, source, copySources, cluster)
+		if err != nil {
+			return err
+		}
 	}
+
+	return nil
 }
+
 func AddTransferToClusterAccount(cluster *clustering.Cluster, account string, t *blockchain.TokenTransfer) {
 	cluster.AccountsTokenTransfers[account] = append(cluster.AccountsTokenTransfers[account], &transfer.TokenTransfer{
 		TokenAddress: t.ContractAddress,
@@ -88,7 +86,6 @@ func AddTransfersToCluster(cluster *clustering.Cluster, ts map[string]*blockchai
 	}
 }
 
-// todo сделать на выходе нормальные связи ?
 func getOwner(tokenTransfers blockchain.TokenTransfers) string {
 	for _, tokenTransfer := range tokenTransfers {
 		if tokenTransfer.SourceAddress == address0 {
