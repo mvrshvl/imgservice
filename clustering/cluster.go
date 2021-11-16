@@ -4,19 +4,18 @@ import (
 	"fmt"
 	"github.com/go-echarts/go-echarts/v2/charts"
 	"github.com/go-echarts/go-echarts/v2/opts"
-	"nir/clustering/blockchain"
 	"nir/clustering/transfer"
 )
 
 type Cluster struct {
 	AccountsExchangeTransfers map[string][]*transfer.ExchangeTransfer
-	AccountsTokenTransfers    map[string][]*blockchain.TokenTransfer
+	AccountsTokenTransfers    map[string][]*transfer.TokenTransfer
 }
 
 type Clusters []*Cluster
 
 func NewCluster() *Cluster {
-	return &Cluster{AccountsExchangeTransfers: make(map[string][]*transfer.ExchangeTransfer)}
+	return &Cluster{AccountsExchangeTransfers: make(map[string][]*transfer.ExchangeTransfer), AccountsTokenTransfers: make(map[string][]*transfer.TokenTransfer)}
 }
 
 func (cl *Cluster) AddTransfer(transfer *transfer.ExchangeTransfer) {

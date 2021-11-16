@@ -1,22 +1,28 @@
 package airdrop
 
 import (
+	"fmt"
 	"nir/clustering"
 	"nir/clustering/blockchain"
+	"nir/clustering/transfer"
 )
 
 const address0 = "0x0000000000000000000000000000000000000000"
 
 //todo сделать для нескольких токенов
-func Find(tokenTransfers blockchain.TokenTransfers) clustering.Clusters {
+func Find(tokenTransfers blockchain.TokenTransfers) (clusters clustering.Clusters) {
 	owner := getOwner(tokenTransfers)
 
 	ownerTransfers := getAccountsByTransfers(tokenTransfers, owner)
 
-	accountsTransfers := getTransfersToAccounts(tokenTransfers, ownerTransfers)
+	accountsTransfers := getAirdropAccountsWithTransfers(tokenTransfers, ownerTransfers)
 
 	for target, sources := range accountsTransfers {
 		copyAccountsTransfers := make(map[string]map[string]*blockchain.TokenTransfer)
+
+		cluster := clustering.NewCluster()
+
+		AddTransfersToCluster(cluster, sources)
 
 		for targetCopy, sourcesCopy := range accountsTransfers {
 			copyAccountsTransfers[targetCopy] = sourcesCopy
@@ -24,24 +30,46 @@ func Find(tokenTransfers blockchain.TokenTransfers) clustering.Clusters {
 
 		// todo сделать ранний выход по количеству входов
 		for copyTarget, copySources := range copyAccountsTransfers {
+			if copyTarget == target {
+				continue
+			}
+
 			for source := range sources {
+				fmt.Println("NIL CHECK", sources, copySources)
+
 				if source != copyTarget {
 					continue
 				}
 
 				for sourceCopySources, transferCopySources := range copySources {
+					AddTransferToClusterAccount(cluster, copyTarget, transferCopySources)
 
 					accountsTransfers[target][sourceCopySources] = transferCopySources
 				}
 
-				delete(copyAccountsTransfers, copyTarget)
+				delete(accountsTransfers, copyTarget)
 			}
 		}
 
-		accountsTransfers = copyAccountsTransfers
+		clusters = append(clusters, cluster)
 	}
 
-	return nil
+	return clusters
+}
+
+func AddTransferToClusterAccount(cluster *clustering.Cluster, account string, t *blockchain.TokenTransfer) {
+	cluster.AccountsTokenTransfers[account] = append(cluster.AccountsTokenTransfers[account], &transfer.TokenTransfer{
+		TokenAddress: t.ContractAddress,
+		FromAddress:  t.SourceAddress,
+		ToAddress:    t.TargetAddress,
+		Value:        t.Value,
+	})
+}
+
+func AddTransfersToCluster(cluster *clustering.Cluster, ts map[string]*blockchain.TokenTransfer) {
+	for _, t := range ts {
+		AddTransferToClusterAccount(cluster, t.TargetAddress, t)
+	}
 }
 
 // todo сделать на выходе нормальные связи ?
@@ -67,21 +95,17 @@ func getAccountsByTransfers(tokenTransfers blockchain.TokenTransfers, distributo
 	return addresses
 }
 
-func getTransfersToAccounts(tokenTransfers blockchain.TokenTransfers, accounts map[string]*blockchain.TokenTransfer) map[string]map[string]*blockchain.TokenTransfer {
+func getAirdropAccountsWithTransfers(tokenTransfers blockchain.TokenTransfers, airdropAccounts map[string]*blockchain.TokenTransfer) map[string]map[string]*blockchain.TokenTransfer {
 	accountsTransfers := make(map[string]map[string]*blockchain.TokenTransfer)
 
-	for distibutor := range accounts {
-		accountsTransfers[distibutor] = make(map[string]*blockchain.TokenTransfer)
+	for acc := range airdropAccounts {
+		accountsTransfers[acc] = map[string]*blockchain.TokenTransfer{airdropAccounts[acc].SourceAddress: airdropAccounts[acc]} //add transfer from distributor
 	}
 
-	for distributor := range accounts {
-		targetsTransfers := getAccountsByTransfers(tokenTransfers, distributor)
+	for acc := range airdropAccounts {
+		targetsTransfers := getAccountsByTransfers(tokenTransfers, acc)
 		for target, tr := range targetsTransfers {
-			if _, ok := accountsTransfers[target]; !ok {
-				accountsTransfers[target] = make(map[string]*blockchain.TokenTransfer)
-			}
-
-			accountsTransfers[target][distributor] = tr
+			accountsTransfers[target][acc] = tr
 		}
 	}
 
