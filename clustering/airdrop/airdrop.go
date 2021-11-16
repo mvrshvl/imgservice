@@ -1,7 +1,6 @@
 package airdrop
 
 import (
-	"fmt"
 	"nir/clustering"
 	"nir/clustering/blockchain"
 	"nir/clustering/transfer"
@@ -18,45 +17,62 @@ func Find(tokenTransfers blockchain.TokenTransfers) (clusters clustering.Cluster
 	accountsTransfers := getAirdropAccountsWithTransfers(tokenTransfers, ownerTransfers)
 
 	for target, sources := range accountsTransfers {
-		copyAccountsTransfers := make(map[string]map[string]*blockchain.TokenTransfer)
-
 		cluster := clustering.NewCluster()
 
 		AddTransfersToCluster(cluster, sources)
 
-		for targetCopy, sourcesCopy := range accountsTransfers {
-			copyAccountsTransfers[targetCopy] = sourcesCopy
+		search(accountsTransfers, target, sources, cluster)
+
+		//for source := range sources {
+		//	if source == target {
+		//		continue
+		//	}
+		//
+		//	copySources, ok := accountsTransfers[source]
+		//	if !ok{
+		//		continue
+		//	}
+		//
+		//	for sourceCopySources, transferCopySources := range copySources {
+		//		AddTransferToClusterAccount(cluster, source, transferCopySources)
+		//
+		//		accountsTransfers[target][sourceCopySources] = transferCopySources
+		//	}
+		//
+		//	delete(accountsTransfers, source)
+		//}
+
+		if len(cluster.AccountsExchangeTransfers) >= 2 {
+			clusters = append(clusters, cluster)
 		}
 
-		// todo сделать ранний выход по количеству входов
-		for copyTarget, copySources := range copyAccountsTransfers {
-			if copyTarget == target {
-				continue
-			}
-
-			for source := range sources {
-				fmt.Println("NIL CHECK", sources, copySources)
-
-				if source != copyTarget {
-					continue
-				}
-
-				for sourceCopySources, transferCopySources := range copySources {
-					AddTransferToClusterAccount(cluster, copyTarget, transferCopySources)
-
-					accountsTransfers[target][sourceCopySources] = transferCopySources
-				}
-
-				delete(accountsTransfers, copyTarget)
-			}
-		}
-
-		clusters = append(clusters, cluster)
 	}
 
 	return clusters
 }
 
+func search(accountsTransfers map[string]map[string]*blockchain.TokenTransfer, target string, sources map[string]*blockchain.TokenTransfer, cluster *clustering.Cluster) {
+	for source := range sources {
+		if source == target {
+			continue
+		}
+
+		copySources, ok := accountsTransfers[source]
+		if !ok {
+			continue
+		}
+
+		AddTransfersToCluster(cluster, copySources)
+		search(accountsTransfers, source, copySources, cluster)
+		//for sourceCopySources, transferCopySources := range copySources {
+		//	AddTransferToClusterAccount(cluster, source, transferCopySources)
+		//
+		//	accountsTransfers[target][sourceCopySources] = transferCopySources
+		//}
+
+		delete(accountsTransfers, source)
+	}
+}
 func AddTransferToClusterAccount(cluster *clustering.Cluster, account string, t *blockchain.TokenTransfer) {
 	cluster.AccountsTokenTransfers[account] = append(cluster.AccountsTokenTransfers[account], &transfer.TokenTransfer{
 		TokenAddress: t.ContractAddress,
