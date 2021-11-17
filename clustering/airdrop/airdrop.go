@@ -14,9 +14,9 @@ const (
 
 //todo сделать для нескольких токенов
 func Find(tokenTransfers blockchain.TokenTransfers) (clusters clustering.Clusters, err error) {
-	owner := getOwner(tokenTransfers)
+	owner := GetOwners(tokenTransfers)
 
-	ownerTransfers := getAccountsByTransfers(tokenTransfers, owner)
+	ownerTransfers := getAccountsByTransfers(tokenTransfers, owner[0])
 
 	accountsTransfers := getAirdropAccountsWithTransfers(tokenTransfers, ownerTransfers)
 
@@ -72,6 +72,8 @@ func search(counter uint64, accountsTransfers map[string]map[string]*blockchain.
 }
 
 func AddTransferToClusterAccount(cluster *clustering.Cluster, account string, t *blockchain.TokenTransfer) {
+	cluster.Accounts[account] = struct{}{}
+
 	cluster.AccountsTokenTransfers[account] = append(cluster.AccountsTokenTransfers[account], &transfer.TokenTransfer{
 		TokenAddress: t.ContractAddress,
 		FromAddress:  t.SourceAddress,
@@ -86,14 +88,14 @@ func AddTransfersToCluster(cluster *clustering.Cluster, ts map[string]*blockchai
 	}
 }
 
-func getOwner(tokenTransfers blockchain.TokenTransfers) string {
+func GetOwners(tokenTransfers blockchain.TokenTransfers) (owners []string) {
 	for _, tokenTransfer := range tokenTransfers {
 		if tokenTransfer.SourceAddress == address0 {
-			return tokenTransfer.TargetAddress
+			owners = append(owners, tokenTransfer.TargetAddress)
 		}
 	}
 
-	return ""
+	return owners
 }
 
 func getAccountsByTransfers(tokenTransfers blockchain.TokenTransfers, distributor string) map[string]*blockchain.TokenTransfer {

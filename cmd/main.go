@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"nir/clustering"
+	"nir/clustering/airdrop"
 	"nir/clustering/blockchain"
 	"nir/clustering/depositreuse"
 	"nir/clustering/transfer"
@@ -49,33 +50,34 @@ func main() {
 
 	ts = transfer.GetExchangeTransfers(chain, cfg.Clustering.MaxBlockDiff)
 
-	clusters := depositreuse.Find(ts)
+	depositClusters := depositreuse.Find(ts)
 
-	err = RenderGraph(chain.Exchanges, cfg.Output.GraphDepositsReuse, clusters, cfg.ShowSingleAccount)
+	airdropClusters, err := airdrop.Find(chain.TokenTransfers)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	//airdropClusters, err := airdrop.Find(chain.TokenTransfers)
-	//if err != nil {
-	//	log.Fatal(err)
-	//}
-
-	err = RenderGraph(chain.Exchanges, cfg.Output.GraphDepositsReuse, clusters, cfg.ShowSingleAccount)
+	merged := airdropClusters.Merge(depositClusters)
+	err = RenderGraph(airdrop.GetOwners(chain.TokenTransfers), chain.Exchanges, cfg.Output.GraphDepositsReuse, merged, cfg.ShowSingleAccount)
 	if err != nil {
 		log.Fatal(err)
 	}
 }
 
-func RenderGraph(exchanges blockchain.Exchanges, filepath string, clusters clustering.Clusters, showSingleAccounts bool) error {
+func RenderGraph(owners []string, exchanges blockchain.Exchanges, filepath string, clusters clustering.Clusters, showSingleAccounts bool) error {
 	exchangesNodes := make(map[string]opts.GraphNode)
 	for _, exch := range exchanges {
 		exchangesNodes[exch.Address] = opts.GraphNode{Name: exch.Name}
 	}
 
+	ownersNodes := make(map[string]opts.GraphNode)
+	for _, owner := range owners {
+		ownersNodes[owner] = opts.GraphNode{Name: owner}
+	}
+
 	page := components.NewPage()
 	page.AddCharts(
-		clusters.GenerateGraph(exchangesNodes, showSingleAccounts),
+		clusters.GenerateGraph(exchangesNodes, ownersNodes, showSingleAccounts),
 	)
 
 	f, err := os.Create(filepath)
