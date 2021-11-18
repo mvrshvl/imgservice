@@ -4,9 +4,9 @@ const (
 	commonAmount = 10000000000
 
 	countExchanges            = 1
-	countCluster              = 1
-	countAccounts             = 10
-	countTransactions         = 50
+	countCluster              = 6
+	countAccounts             = 40
+	countTransactions         = 80
 	maxCountAccountsInCluster = 4
 	transactonsPerSecond      = 30
 	mixTokensDepth            = 4

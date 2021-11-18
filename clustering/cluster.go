@@ -46,11 +46,11 @@ func (cl *Cluster) merge(cluster *Cluster) {
 }
 
 const (
-	accountsIndex = iota
-	depositsIndex
-	clustersIndex
-	ownersIndex
-	exchangesIndex
+	depositsIndex  = 1
+	accountsIndex  = 2
+	clustersIndex  = 3
+	ownersIndex    = 4
+	exchangesIndex = 5
 )
 
 func getNodeTypes() map[int]string {
@@ -66,58 +66,28 @@ func getNodeTypes() map[int]string {
 func getCategories() (categories []*opts.GraphCategory) {
 	nodeTypes := getNodeTypes()
 
-	for i := 0; i < len(nodeTypes); i++ {
+	for i := 1; i <= len(nodeTypes)+1; i++ {
 		categories = append(categories, &opts.GraphCategory{
-			Name: nodeTypes[i],
-			Label: &opts.Label{
-				Show:      true,
-				Color:     "#000000",
-				Position:  "right",
-				Formatter: nodeTypes[i],
-			},
+			Name: nodeTypes[i-1],
+			//Label: &opts.Label{
+			//	Show:      false,
+			//	Position:  "right",
+			//	Formatter: nodeTypes[i-1],
+			//},
 		})
 	}
 
 	return
 }
 
-func newAccountNode(name string) opts.GraphNode {
+func newNode(name string, category int) opts.GraphNode {
 	return opts.GraphNode{
-		Name:      name,
-		Category:  accountsIndex,
-		ItemStyle: &opts.ItemStyle{Color: "#fc8452"},
-	}
-}
-
-func newDepositNode(name string) opts.GraphNode {
-	return opts.GraphNode{
-		Name:      name,
-		Category:  depositsIndex,
-		ItemStyle: &opts.ItemStyle{Color: "#f9e215"},
-	}
-}
-
-func newClusterNode(name string) opts.GraphNode {
-	return opts.GraphNode{
-		Name:      name,
-		Category:  clustersIndex,
-		ItemStyle: &opts.ItemStyle{Color: "#f92a13"},
-	}
-}
-
-func newExchangeNode(name string) opts.GraphNode {
-	return opts.GraphNode{
-		Name:      name,
-		Category:  exchangesIndex,
-		ItemStyle: &opts.ItemStyle{Color: "#3ba272"},
-	}
-}
-
-func newOwnerNode(name string) opts.GraphNode {
-	return opts.GraphNode{
-		Name:      name,
-		Category:  ownersIndex,
-		ItemStyle: &opts.ItemStyle{Color: "#44bcba"},
+		Name:       name,
+		Category:   category,
+		SymbolSize: 20,
+		ItemStyle: &opts.ItemStyle{
+			Opacity: 0,
+		},
 	}
 }
 
@@ -129,13 +99,13 @@ func (cls Clusters) GenerateGraph(exchanges map[string]opts.GraphNode, tokenOwne
 
 	isAdded := make(map[string]struct{})
 	for _, node := range exchanges {
-		node.ItemStyle = newExchangeNode("").ItemStyle
-		nodes = append(nodes, node)
+		//node.ItemStyle = newExchangeNode("").ItemStyle
+		nodes = append(nodes, newNode(node.Name, exchangesIndex))
 	}
 
 	for _, node := range tokenOwners {
-		node.ItemStyle = newOwnerNode("").ItemStyle
-		nodes = append(nodes, node)
+		//node.ItemStyle = newOwnerNode("").ItemStyle
+		nodes = append(nodes, newNode(node.Name, ownersIndex))
 	}
 
 	for numCluster, cluster := range cls {
@@ -143,11 +113,13 @@ func (cls Clusters) GenerateGraph(exchanges map[string]opts.GraphNode, tokenOwne
 			continue
 		}
 
-		clusterNode := opts.GraphNode{Name: fmt.Sprintf("cluster%d", numCluster), ItemStyle: newClusterNode("").ItemStyle}
+		//clusterNode := opts.GraphNode{Name: fmt.Sprintf("cluster%d", numCluster), ItemStyle: newClusterNode("").ItemStyle}
+		clusterNode := newNode(fmt.Sprintf("cluster%d", numCluster), clustersIndex)
 		nodes = append(nodes, clusterNode)
 
 		for account := range cluster.Accounts {
-			nodes = append(nodes, opts.GraphNode{Name: account, ItemStyle: newAccountNode("").ItemStyle})
+			//nodes = append(nodes, opts.GraphNode{Name: account, ItemStyle: newAccountNode("").ItemStyle})
+			nodes = append(nodes, newNode(account, accountsIndex))
 
 			links = append(links, opts.GraphLink{Source: account, Target: clusterNode.Name})
 		}
@@ -165,7 +137,8 @@ func (cls Clusters) GenerateGraph(exchanges map[string]opts.GraphNode, tokenOwne
 				if _, ok := isAdded[deposit]; !ok {
 					isAdded[deposit] = struct{}{}
 
-					nodes = append(nodes, opts.GraphNode{Name: deposit, ItemStyle: newDepositNode("").ItemStyle})
+					//nodes = append(nodes, opts.GraphNode{Name: deposit, ItemStyle: newDepositNode("").ItemStyle})
+					nodes = append(nodes, newNode(deposit, depositsIndex))
 				}
 
 				links = append(links, opts.GraphLink{Source: clusterNode.Name, Target: account})
@@ -183,34 +156,15 @@ func (cls Clusters) GenerateGraph(exchanges map[string]opts.GraphNode, tokenOwne
 
 	graph := charts.NewGraph()
 	graph.SetGlobalOptions(
-		charts.WithTitleOpts(opts.Title{Title: "Clusters"}),
+		charts.WithTitleOpts(opts.Title{Title: "Clustering"}),
+		charts.WithLegendOpts(opts.Legend{Show: true, Right: "30%"}),
 	)
 
 	graph.AddSeries("graph", nodes, links,
 		charts.WithGraphChartOpts(
-			opts.GraphChart{Force: &opts.GraphForce{Repulsion: 1000}},
-		),
-	)
-
-	return graph
-}
-
-func (cls Clusters) GenerateLegend() *charts.Graph {
-	graph := charts.NewGraph()
-	graph.SetGlobalOptions(
-		charts.WithTitleOpts(opts.Title{Title: "Legend"}),
-	)
-
-	graph.AddSeries("graph", []opts.GraphNode{newClusterNode("c"), newDepositNode("d"), newExchangeNode("e"), newAccountNode("a"), newOwnerNode("o")}, nil,
-		charts.WithGraphChartOpts(
-			opts.GraphChart{Force: &opts.GraphForce{Repulsion: 100},
+			opts.GraphChart{Force: &opts.GraphForce{Repulsion: 500},
 				Categories: getCategories()},
 		),
-		charts.WithLabelOpts(*getCategories()[accountsIndex].Label),
-		charts.WithLabelOpts(*getCategories()[depositsIndex].Label),
-		charts.WithLabelOpts(*getCategories()[ownersIndex].Label),
-		charts.WithLabelOpts(*getCategories()[exchangesIndex].Label),
-		charts.WithLabelOpts(*getCategories()[clustersIndex].Label),
 	)
 
 	return graph

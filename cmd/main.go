@@ -78,7 +78,7 @@ func RenderGraph(owners []string, exchanges blockchain.Exchanges, filepath strin
 	page := components.NewPage()
 	page.AddCharts(
 		clusters.GenerateGraph(exchangesNodes, ownersNodes, showSingleAccounts),
-		clusters.GenerateLegend(),
+		//clusters.GenerateLegend(),
 	)
 
 	f, err := os.Create(filepath)
