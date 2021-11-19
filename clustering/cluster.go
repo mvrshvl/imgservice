@@ -91,7 +91,7 @@ func newNode(name string, category int) opts.GraphNode {
 	}
 }
 
-// выделить тип чартс который будет выводить все графики, считать количество аккаунтов и т.п. и делать пирог со всеми подсчетами
+const maxSize = 5000
 
 func (cls Clusters) GenerateGraph(exchanges map[string]opts.GraphNode, tokenOwners map[string]opts.GraphNode, showSingleAccounts bool) *charts.Graph {
 	nodes := make([]opts.GraphNode, 0)
@@ -109,7 +109,7 @@ func (cls Clusters) GenerateGraph(exchanges map[string]opts.GraphNode, tokenOwne
 	}
 
 	for numCluster, cluster := range cls {
-		if len(cluster.AccountsExchangeTransfers) == 1 && showSingleAccounts {
+		if len(cluster.Accounts) == 1 && !showSingleAccounts {
 			continue
 		}
 
@@ -154,15 +154,26 @@ func (cls Clusters) GenerateGraph(exchanges map[string]opts.GraphNode, tokenOwne
 		}
 	}
 
+	size := len(nodes) * 15
+	if size > maxSize {
+		size = maxSize
+	}
+
+	sizePx := fmt.Sprintf("%dpx", size)
+
 	graph := charts.NewGraph()
 	graph.SetGlobalOptions(
-		charts.WithTitleOpts(opts.Title{Title: "Clustering"}),
-		charts.WithLegendOpts(opts.Legend{Show: true, Right: "30%"}),
+		charts.WithTitleOpts(opts.Title{Left: "30%", Title: "Clustering"}),
+		charts.WithLegendOpts(opts.Legend{Show: true, Top: "5%", Left: "30%"}),
+		charts.WithInitializationOpts(opts.Initialization{
+			Width:  sizePx,
+			Height: sizePx,
+		}),
 	)
 
 	graph.AddSeries("graph", nodes, links,
 		charts.WithGraphChartOpts(
-			opts.GraphChart{Force: &opts.GraphForce{Repulsion: 500},
+			opts.GraphChart{Force: &opts.GraphForce{Repulsion: 250},
 				Categories: getCategories()},
 		),
 	)
@@ -171,11 +182,25 @@ func (cls Clusters) GenerateGraph(exchanges map[string]opts.GraphNode, tokenOwne
 }
 
 func (cls Clusters) Merge(clusters Clusters) (newClusters Clusters) {
+	merged := make(map[int]*Cluster)
+
+	for j, jCluster := range clusters {
+		merged[j] = jCluster
+	}
+
 	for _, iCluster := range cls {
-		for _, jCluster := range clusters {
+		for j, jCluster := range clusters {
 			if ok := iCluster.Merge(jCluster); ok {
-				newClusters = append(newClusters, iCluster)
+				merged[j] = jCluster
 			}
+		}
+
+		newClusters = append(newClusters, iCluster)
+	}
+
+	for j, jCluster := range clusters {
+		if _, ok := merged[j]; !ok {
+			newClusters = append(newClusters, jCluster)
 		}
 	}
 

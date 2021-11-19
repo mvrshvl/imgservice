@@ -12,41 +12,42 @@ const (
 	errRecursiveCounter = amlerror.AMLError("Recursion exceeded the allowed rate")
 )
 
-//todo сделать для нескольких токенов
 func Find(tokenTransfers blockchain.TokenTransfers) (clusters clustering.Clusters, err error) {
-	owner := GetOwners(tokenTransfers)
+	owners := GetOwners(tokenTransfers)
 
-	ownerTransfers := getAccountsByTransfers(tokenTransfers, owner[0])
+	for _, owner := range owners {
+		ownerTransfers := getAccountsByTransfers(tokenTransfers, owner)
 
-	accountsTransfers := getAirdropAccountsWithTransfers(tokenTransfers, ownerTransfers)
+		remainingAccountsTransfers := getAirdropAccountsWithTransfers(tokenTransfers, ownerTransfers)
 
-	for target, sources := range accountsTransfers {
-		cluster := clustering.NewCluster()
+		for target, sources := range remainingAccountsTransfers {
+			cluster := clustering.NewCluster()
 
-		AddTransfersToCluster(cluster, sources)
+			AddTransfersToCluster(cluster, sources)
 
-		err = search(0, accountsTransfers, target, sources, cluster)
-		if err != nil {
-			return nil, err
+			err = merge(remainingAccountsTransfers, 0, target, sources, cluster)
+			if err != nil {
+				return nil, err
+			}
+
+			if len(cluster.AccountsTokenTransfers) >= 2 {
+				clusters = append(clusters, cluster)
+			}
+
 		}
 
-		if len(cluster.AccountsTokenTransfers) >= 2 {
+		for _, ts := range remainingAccountsTransfers {
+			cluster := clustering.NewCluster()
+			AddTransfersToCluster(cluster, ts)
+
 			clusters = append(clusters, cluster)
 		}
-
-	}
-
-	for _, ts := range accountsTransfers {
-		cluster := clustering.NewCluster()
-		AddTransfersToCluster(cluster, ts)
-
-		clusters = append(clusters, cluster)
 	}
 
 	return
 }
 
-func search(counter uint64, accountsTransfers map[string]map[string]*blockchain.TokenTransfer, target string, sources map[string]*blockchain.TokenTransfer, cluster *clustering.Cluster) error {
+func merge(accountsTransfers map[string]map[string]*blockchain.TokenTransfer, counter uint64, target string, sources map[string]*blockchain.TokenTransfer, cluster *clustering.Cluster) error {
 	if counter == 100000 {
 		return errRecursiveCounter
 	}
@@ -62,7 +63,7 @@ func search(counter uint64, accountsTransfers map[string]map[string]*blockchain.
 		delete(accountsTransfers, target)
 		delete(accountsTransfers, source)
 
-		err := search(counter+1, accountsTransfers, source, copySources, cluster)
+		err := merge(accountsTransfers, counter+1, source, copySources, cluster)
 		if err != nil {
 			return err
 		}
