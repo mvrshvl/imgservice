@@ -36,9 +36,11 @@ func main() {
 
 	log.Println("Start airdrop...")
 
-	err = airdrop(ctx, users)
-	if err != nil {
-		log.Fatal(err)
+	for i := 0; i < countTokens; i++ {
+		err = airdrop(ctx, users)
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 
 	log.Println("Start sending transactions to exchange...")
@@ -341,8 +343,13 @@ func airdrop(ctx context.Context, users []*user.User) error {
 }
 
 func transferTokensToUsers(ctx context.Context, users []*user.User, tokenContract *contract.SimpleToken, distributor *account.Account, tokens *big.Int) error {
-	for _, u := range users {
-		for _, acc := range u.GetAccounts() {
+	for i := 0; i < len(users); i += 4 {
+		randIdx := i + rand.Intn(4)
+		if randIdx > len(users)-1 {
+			return nil
+		}
+
+		for _, acc := range users[randIdx].GetAccounts() {
 			err := transferToken(ctx, tokenContract, distributor, acc, tokens)
 			if err != nil {
 				return err

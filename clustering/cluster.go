@@ -118,8 +118,10 @@ func (cls Clusters) GenerateGraph(exchanges map[string]opts.GraphNode, tokenOwne
 		nodes = append(nodes, clusterNode)
 
 		for account := range cluster.Accounts {
-			//nodes = append(nodes, opts.GraphNode{Name: account, ItemStyle: newAccountNode("").ItemStyle})
-			nodes = append(nodes, newNode(account, accountsIndex))
+			if _, ok := isAdded[account]; !ok {
+				isAdded[account] = struct{}{}
+				nodes = append(nodes, newNode(account, accountsIndex))
+			}
 
 			links = append(links, opts.GraphLink{Source: account, Target: clusterNode.Name})
 		}
@@ -154,7 +156,7 @@ func (cls Clusters) GenerateGraph(exchanges map[string]opts.GraphNode, tokenOwne
 		}
 	}
 
-	size := len(nodes) * 15
+	size := len(nodes) * 20
 	if size > maxSize {
 		size = maxSize
 	}
@@ -173,7 +175,7 @@ func (cls Clusters) GenerateGraph(exchanges map[string]opts.GraphNode, tokenOwne
 
 	graph.AddSeries("graph", nodes, links,
 		charts.WithGraphChartOpts(
-			opts.GraphChart{Force: &opts.GraphForce{Repulsion: 250},
+			opts.GraphChart{Force: &opts.GraphForce{Repulsion: 500},
 				Categories: getCategories()},
 		),
 	)
@@ -202,6 +204,32 @@ func (cls Clusters) Merge(clusters Clusters) (newClusters Clusters) {
 		if _, ok := merged[j]; !ok {
 			newClusters = append(newClusters, jCluster)
 		}
+	}
+
+	for {
+		copyCLusters := make(Clusters, len(newClusters))
+		copy(copyCLusters, newClusters)
+
+	Loop:
+		for i, iCluster := range newClusters {
+			for j, jCluster := range newClusters {
+				if i == j {
+					continue
+				}
+
+				if iCluster.Merge(jCluster) {
+					copyCLusters = append(copyCLusters[:j], copyCLusters[j+1:]...)
+
+					break Loop
+				}
+			}
+		}
+
+		if len(copyCLusters) == len(newClusters) {
+			break
+		}
+
+		newClusters = copyCLusters
 	}
 
 	return

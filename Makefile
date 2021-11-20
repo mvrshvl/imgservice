@@ -14,3 +14,6 @@ stop:
 
 gen-binding:
 	docker build -t bindings -f ./test/contract/generator/Dockerfile ./test/contract && docker run --privileged -v $(PWD)/test/contract:/contract bindings
+
+network:
+	docker network create --driver=bridge --subnet=172.25.0.0/24 chainnet || true
