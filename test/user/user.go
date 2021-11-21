@@ -3,12 +3,15 @@ package user
 import (
 	"context"
 	"fmt"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"math/big"
 	"math/rand"
+	"nir/test/contract"
 	"nir/test/entity/account"
 	"nir/test/exchange"
+	"nir/test/writer"
 )
 
 type User struct {
@@ -81,7 +84,7 @@ func (ent *User) CollectTokenOnOneAcc(ctx context.Context, mixDepth int, getBala
 		return err
 	}
 
-	mainAccount := ent.randomAccount()
+	mainAccount := ent.RandomAccount()
 
 	err = ent.mixTokens(ctx, mainAccount, balances, mixDepth, transferToken)
 	if err != nil {
@@ -112,7 +115,7 @@ func (ent *User) mixTokens(ctx context.Context, mainAccount *account.Account, ba
 
 	for balances[mainAccount] != sum || currentDepth < mixDepth-1 {
 		for source, balance := range balances {
-			target := ent.randomAccount()
+			target := ent.RandomAccount()
 
 			if source.GetAddress().String() == target.GetAddress().String() || balance == 0 {
 				continue
@@ -161,6 +164,79 @@ func transferWithinCluster(ctx context.Context, balances map[*account.Account]in
 	return nil
 }
 
-func (ent *User) randomAccount() *account.Account {
+func (ent *User) RandomAccount() *account.Account {
 	return ent.accounts[rand.Intn(len(ent.accounts)-1)]
+}
+
+func (ent *User) DeployContract(ctx context.Context, tokens int) (*contract.SimpleToken, error) {
+	distributor := ent.RandomAccount()
+
+	bytecode, err := contract.BytecodeContract(contract.SimpleTokenBin, contract.SimpleTokenABI, "test", "t", big.NewInt(int64(tokens)))
+	if err != nil {
+		return nil, err
+	}
+
+	var gas uint64
+
+	err = writer.Execute(ctx, func(w *writer.Writer) (innerErr error) {
+		gas, innerErr = w.EstimateGas(ctx, *distributor.GetAddress(), nil, bytecode)
+
+		return innerErr
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	err = writer.Execute(ctx, func(w *writer.Writer) error {
+		b, innerErr := w.BalanceAt(ctx, *distributor.GetAddress())
+		if innerErr != nil {
+			return innerErr
+		}
+
+		fmt.Println("Distributor balance before deploy", b.Int64())
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	var token *contract.SimpleToken
+
+	err = executeToken(ctx, distributor, gas, func(auth *bind.TransactOpts, backend bind.ContractBackend) (tx *types.Transaction, innerErr error) {
+		_, tx, token, innerErr = contract.DeploySimpleToken(auth, backend, "TestContract", "TC", big.NewInt(100000000000))
+
+		return tx, innerErr
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	for _, acc := range ent.accounts {
+		err = executeToken(ctx, distributor, gas, func(auth *bind.TransactOpts, backend bind.ContractBackend) (*types.Transaction, error) {
+			return token.Approve(auth, *acc.GetAddress(), big.NewInt(1))
+		})
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return token, err
+}
+
+func executeToken(ctx context.Context, owner *account.Account, gas uint64, fn func(auth *bind.TransactOpts, backend bind.ContractBackend) (*types.Transaction, error)) error {
+	tx, err := owner.ExecuteContract(ctx, gas, fn)
+	if err != nil {
+		return err
+	}
+
+	return writer.Execute(ctx, func(w *writer.Writer) error {
+		return w.WaitTx(ctx, tx.Hash())
+	})
+}
+
+func (ent *User) ExecuteContract(ctx context.Context, gasLimit uint64, fn func(auth *bind.TransactOpts, backend bind.ContractBackend) (*types.Transaction, error)) (tx *types.Transaction, err error) {
+	acc := ent.RandomAccount()
+
+	return acc.ExecuteContract(ctx, gasLimit, fn)
 }

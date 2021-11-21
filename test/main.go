@@ -43,6 +43,13 @@ func main() {
 		}
 	}
 
+	log.Println("Start self-auth...")
+
+	err = selfAuth(ctx, users)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	log.Println("Start sending transactions to exchange...")
 
 	sendTransactionsToExchange(ctx, users, exchanges, countTransactions)
@@ -180,25 +187,25 @@ func closeExchanges(exchanges []*exchange.Exchange) {
 	wg.Wait()
 }
 
-func addEthToAccount(ctx context.Context, acc *common.Address, amount int64) error {
-	waitCh := make(chan struct{})
-
-	err := startbalance.AddTask(ctx, func(a *account.Account) {
-		_, err := a.SendTransaction(ctx, acc, amount, true)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		close(waitCh)
-	})
-	if err != nil {
-		return err
-	}
-
-	<-waitCh
-
-	return nil
-}
+//func addEthToAccount(ctx context.Context, acc *common.Address, amount int64) error {
+//	waitCh := make(chan struct{})
+//
+//	err := startbalance.AddTask(ctx, func(a *account.Account) {
+//		_, err := a.SendTransaction(ctx, acc, amount, true)
+//		if err != nil {
+//			log.Fatal(err)
+//		}
+//
+//		close(waitCh)
+//	})
+//	if err != nil {
+//		return err
+//	}
+//
+//	<-waitCh
+//
+//	return nil
+//}
 
 func createUsers() []*user.User {
 	clustersDepositReuse, err := createEOAs(countCluster, maxCountAccountsInCluster)
@@ -244,86 +251,23 @@ func prepareDeps(ctx context.Context) (context.Context, func()) {
 	}
 }
 
-func deployContract(ctx context.Context, distributor *account.Account, tokens int) (*contract.SimpleToken, error) {
-	bytecode, err := contract.BytecodeContract(contract.SimpleTokenBin, contract.SimpleTokenABI, "test", "t", big.NewInt(int64(tokens)))
-	if err != nil {
-		return nil, err
-	}
-
-	var gas uint64
-
-	err = writer.Execute(ctx, func(w *writer.Writer) (innerErr error) {
-		gas, innerErr = w.EstimateGas(ctx, *distributor.GetAddress(), nil, bytecode)
-
-		return innerErr
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	err = writer.Execute(ctx, func(w *writer.Writer) error {
-		b, innerErr := w.BalanceAt(ctx, *distributor.GetAddress())
-		if innerErr != nil {
-			return innerErr
-		}
-
-		fmt.Println("Distributor balance before deploy", b.Int64())
-
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	var token *contract.SimpleToken
-
-	tx, err := distributor.ExecuteContract(ctx, gas, func(auth *bind.TransactOpts, backend bind.ContractBackend) (tx *types.Transaction, innerErr error) {
-		_, tx, token, innerErr = contract.DeploySimpleToken(auth, backend, "TestContract", "TC", big.NewInt(100000000000))
-
-		return tx, innerErr
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	err = writer.Execute(ctx, func(w *writer.Writer) error {
-		return w.WaitTx(ctx, tx.Hash())
-	})
-
-	err = writer.Execute(ctx, func(w *writer.Writer) error {
-		b, innerErr := w.BalanceAt(ctx, *distributor.GetAddress())
-		if innerErr != nil {
-			return innerErr
-		}
-
-		fmt.Println("Distributor balance after deploy", b.Int64(), "tx hash", tx.Hash().String())
-
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return token, err
-}
-
 func airdrop(ctx context.Context, users []*user.User) error {
-	distributor, err := account.CreateAccount()
+	distributor, err := user.CreateUserFromSize(1)
 	if err != nil {
 		return err
 	}
 
-	err = addEthToAccount(ctx, distributor.GetAddress(), commonAmount)
+	err = entity.AddEtherToEntity(ctx, distributor, commonAmount)
 	if err != nil {
 		return err
 	}
 
-	tokenContract, err := deployContract(ctx, distributor, countAccounts)
+	tokenContract, err := distributor.DeployContract(ctx, countAccounts)
 	if err != nil {
 		return err
 	}
 
-	err = transferTokensToUsers(ctx, users, tokenContract, distributor, big.NewInt(1))
+	err = transferTokensToUsers(ctx, users, tokenContract, distributor.RandomAccount(), big.NewInt(1))
 	if err != nil {
 		return err
 	}
@@ -419,4 +363,21 @@ func createEntitiesWithEther(ctx context.Context) ([]*user.User, []*exchange.Exc
 	}
 
 	return users, exchanges, nil
+}
+
+func selfAuth(ctx context.Context, users []*user.User) error {
+	for _, us := range users {
+		accs := us.GetAccounts()
+		accsCount := len(accs)
+		if accsCount <= 1 {
+			continue
+		}
+
+		_, err := us.DeployContract(ctx, accsCount)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
