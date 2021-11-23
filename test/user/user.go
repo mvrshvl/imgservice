@@ -165,6 +165,10 @@ func transferWithinCluster(ctx context.Context, balances map[*account.Account]in
 }
 
 func (ent *User) RandomAccount() *account.Account {
+	if len(ent.accounts) == 1 {
+		return ent.accounts[0]
+	}
+
 	return ent.accounts[rand.Intn(len(ent.accounts)-1)]
 }
 
@@ -213,6 +217,8 @@ func (ent *User) DeployContract(ctx context.Context, tokens int) (*contract.Simp
 	}
 
 	for _, acc := range ent.accounts {
+		fmt.Println("APPROVE")
+
 		err = executeToken(ctx, distributor, gas, func(auth *bind.TransactOpts, backend bind.ContractBackend) (*types.Transaction, error) {
 			return token.Approve(auth, *acc.GetAddress(), big.NewInt(1))
 		})
