@@ -1,7 +1,5 @@
 package blockchain
 
-import "encoding/hex"
-
 type Blockchain struct {
 	Transactions   Transactions
 	Blocks         Blocks
@@ -11,13 +9,9 @@ type Blockchain struct {
 }
 
 func New(transactions []*Transaction, blocks []*Block, exchanges []*Exchange, tokenTransfers TokenTransfers, logs Logs) (*Blockchain, error) {
-	for _, l := range logs {
-		data, err := hex.DecodeString(l.Data)
-		if err != nil {
-			return nil, err
-		}
-
-		l.Data = string(data)
+	approves, err := logs.ToApproves(transactions)
+	if err != nil {
+		return nil, err
 	}
 
 	return &Blockchain{
@@ -25,6 +19,6 @@ func New(transactions []*Transaction, blocks []*Block, exchanges []*Exchange, to
 		Blocks:         blocks,
 		Exchanges:      exchanges,
 		TokenTransfers: tokenTransfers,
-		Approves:       logs.ToApproves(),
+		Approves:       approves,
 	}, nil
 }

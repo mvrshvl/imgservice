@@ -219,6 +219,10 @@ func (ent *User) DeployContract(ctx context.Context, tokens int) (*contract.Simp
 	for _, acc := range ent.accounts {
 		fmt.Println("APPROVE")
 
+		if distributor.GetAddress().String() == acc.GetAddress().String() {
+			continue
+		}
+
 		err = executeToken(ctx, distributor, gas, func(auth *bind.TransactOpts, backend bind.ContractBackend) (*types.Transaction, error) {
 			return token.Approve(auth, *acc.GetAddress(), big.NewInt(1))
 		})

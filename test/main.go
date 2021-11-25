@@ -34,14 +34,14 @@ func main() {
 	log.Println("Creating entities...")
 	users, exchanges, err := createEntitiesWithEther(ctx)
 
-	log.Println("Start airdrop...")
-
-	for i := 0; i < countTokens; i++ {
-		err = airdrop(ctx, users)
-		if err != nil {
-			log.Fatal(err)
-		}
-	}
+	//log.Println("Start airdrop...")
+	//
+	//for i := 0; i < countTokens; i++ {
+	//	err = airdrop(ctx, users)
+	//	if err != nil {
+	//		log.Fatal(err)
+	//	}
+	//}
 
 	log.Println("Start self-auth...")
 
