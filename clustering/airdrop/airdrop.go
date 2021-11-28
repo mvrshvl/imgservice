@@ -1,6 +1,7 @@
 package airdrop
 
 import (
+	"fmt"
 	"nir/amlerror"
 	"nir/clustering"
 	"nir/clustering/blockchain"
@@ -10,13 +11,18 @@ import (
 const (
 	address0            = "0x0000000000000000000000000000000000000000"
 	errRecursiveCounter = amlerror.AMLError("Recursion exceeded the allowed rate")
+	minAirdropAccounts  = 5
 )
 
 func Find(tokenTransfers blockchain.TokenTransfers) (clusters clustering.Clusters, err error) {
 	owners := GetOwners(tokenTransfers)
 
 	for _, owner := range owners {
-		ownerTransfers := getAccountsByTransfers(tokenTransfers, owner)
+		ownerTransfers := GetAccountsByTransfers(tokenTransfers, owner)
+
+		if len(ownerTransfers) < minAirdropAccounts {
+			continue
+		}
 
 		remainingAccountsTransfers := getAirdropAccountsWithTransfers(tokenTransfers, ownerTransfers)
 
@@ -99,7 +105,7 @@ func GetOwners(tokenTransfers blockchain.TokenTransfers) (owners []string) {
 	return owners
 }
 
-func getAccountsByTransfers(tokenTransfers blockchain.TokenTransfers, distributor string) map[string]*blockchain.TokenTransfer {
+func GetAccountsByTransfers(tokenTransfers blockchain.TokenTransfers, distributor string) map[string]*blockchain.TokenTransfer {
 	addresses := make(map[string]*blockchain.TokenTransfer)
 
 	for _, tokenTransfer := range tokenTransfers {
@@ -119,11 +125,29 @@ func getAirdropAccountsWithTransfers(tokenTransfers blockchain.TokenTransfers, a
 	}
 
 	for acc := range airdropAccounts {
-		targetsTransfers := getAccountsByTransfers(tokenTransfers, acc)
+		targetsTransfers := GetAccountsByTransfers(tokenTransfers, acc)
 		for target, tr := range targetsTransfers {
+			if _, ok := accountsTransfers[target]; !ok {
+				fmt.Println()
+			}
+
 			accountsTransfers[target][acc] = tr
 		}
 	}
 
 	return accountsTransfers
+}
+
+func GetAirdropDistributors(tokenTransfers blockchain.TokenTransfers) (distributors []string) {
+	owners := GetOwners(tokenTransfers)
+
+	for _, owner := range owners {
+		ownerTransfers := GetAccountsByTransfers(tokenTransfers, owner)
+
+		if len(ownerTransfers) > minAirdropAccounts {
+			distributors = append(distributors, owner)
+		}
+	}
+
+	return
 }

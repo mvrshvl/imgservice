@@ -3,13 +3,14 @@ package main
 const (
 	commonAmount = 10000000000
 
-	countTokens               = 3
-	countExchanges            = 2
-	countCluster              = 30
-	countAccounts             = 2000
-	countTransactions         = 20000
-	maxCountAccountsInCluster = 10
-	transactonsPerSecond      = 30
+	countAirdropTokens        = 1
+	countClusterTokens        = 2
+	countExchanges            = 1
+	countCluster              = 2
+	countAccounts             = 20
+	countTransactions         = 100
+	maxCountAccountsInCluster = 6
+	transactonsPerSecond      = 100
 	mixTokensDepth            = 4
 )
 

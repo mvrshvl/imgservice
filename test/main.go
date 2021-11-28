@@ -34,14 +34,14 @@ func main() {
 	log.Println("Creating entities...")
 	users, exchanges, err := createEntitiesWithEther(ctx)
 
-	//log.Println("Start airdrop...")
-	//
-	//for i := 0; i < countTokens; i++ {
-	//	err = airdrop(ctx, users)
-	//	if err != nil {
-	//		log.Fatal(err)
-	//	}
-	//}
+	log.Println("Start airdrop...")
+
+	for i := 0; i < countAirdropTokens; i++ {
+		err = airdrop(ctx, users)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
 
 	log.Println("Start self-auth...")
 
@@ -373,9 +373,11 @@ func selfAuth(ctx context.Context, users []*user.User) error {
 			continue
 		}
 
-		_, err := us.DeployContract(ctx, accsCount)
-		if err != nil {
-			return err
+		for i := 0; i < countClusterTokens; i++ {
+			_, err := us.DeployContract(ctx, accsCount)
+			if err != nil {
+				return err
+			}
 		}
 	}
 

@@ -10,6 +10,7 @@ import (
 	"nir/clustering/airdrop"
 	"nir/clustering/blockchain"
 	"nir/clustering/depositreuse"
+	"nir/clustering/selfauth"
 	"nir/clustering/transfer"
 	"nir/config"
 	"nir/di"
@@ -57,8 +58,12 @@ func main() {
 		log.Fatal(err)
 	}
 
-	merged := airdropClusters.Merge(depositClusters)
-	err = RenderGraph(airdrop.GetOwners(chain.TokenTransfers), chain.Exchanges, cfg.Output.GraphDepositsReuse, merged, cfg.ShowSingleAccount)
+	selfauthClusters := selfauth.Find(chain.Approves)
+
+	m := airdropClusters.Merge(depositClusters)
+	merged := m.Merge(selfauthClusters)
+
+	err = RenderGraph(airdrop.GetAirdropDistributors(chain.TokenTransfers), chain.Exchanges, cfg.Output.GraphDepositsReuse, merged, cfg.ShowSingleAccount)
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/go-echarts/go-echarts/v2/charts"
 	"github.com/go-echarts/go-echarts/v2/opts"
+	"nir/clustering/blockchain"
 	"nir/clustering/transfer"
 )
 
@@ -11,12 +12,13 @@ type Cluster struct {
 	Accounts                  map[string]struct{}
 	AccountsExchangeTransfers map[string][]*transfer.ExchangeTransfer
 	AccountsTokenTransfers    map[string][]*transfer.TokenTransfer
+	TokensAuth                map[string]map[string]*blockchain.ERC20Approve
 }
 
 type Clusters []*Cluster
 
 func NewCluster() *Cluster {
-	return &Cluster{Accounts: make(map[string]struct{}), AccountsExchangeTransfers: make(map[string][]*transfer.ExchangeTransfer), AccountsTokenTransfers: make(map[string][]*transfer.TokenTransfer)}
+	return &Cluster{Accounts: make(map[string]struct{}), AccountsExchangeTransfers: make(map[string][]*transfer.ExchangeTransfer), AccountsTokenTransfers: make(map[string][]*transfer.TokenTransfer), TokensAuth: make(map[string]map[string]*blockchain.ERC20Approve)}
 }
 
 func (cl *Cluster) Merge(cluster *Cluster) bool {
@@ -41,6 +43,18 @@ func (cl *Cluster) merge(cluster *Cluster) {
 
 		if tokenTransfers, ok := cluster.AccountsTokenTransfers[acc]; ok {
 			cl.AccountsTokenTransfers[acc] = append(cl.AccountsTokenTransfers[acc], tokenTransfers...)
+		}
+	}
+
+	for token, approves := range cluster.TokensAuth {
+		if _, ok := cl.TokensAuth[token]; !ok {
+			cl.TokensAuth[token] = approves
+
+			continue
+		}
+
+		for _, approve := range approves {
+			cl.TokensAuth[token][approve.TxHash] = approve
 		}
 	}
 }
@@ -69,11 +83,6 @@ func getCategories() (categories []*opts.GraphCategory) {
 	for i := 1; i <= len(nodeTypes)+1; i++ {
 		categories = append(categories, &opts.GraphCategory{
 			Name: nodeTypes[i-1],
-			//Label: &opts.Label{
-			//	Show:      false,
-			//	Position:  "right",
-			//	Formatter: nodeTypes[i-1],
-			//},
 		})
 	}
 
@@ -91,40 +100,23 @@ func newNode(name string, category int) opts.GraphNode {
 	}
 }
 
-const maxSize = 5000
+const (
+	maxSize = 5000
+	minSize = 800
+)
 
 func (cls Clusters) GenerateGraph(exchanges map[string]opts.GraphNode, tokenOwners map[string]opts.GraphNode, showSingleAccounts bool) *charts.Graph {
-	nodes := make([]opts.GraphNode, 0)
+	nodesMapping := make(map[string]opts.GraphNode)
+
+	//nodes := make([]opts.GraphNode, 0)
 	links := make([]opts.GraphLink, 0)
-
-	isAdded := make(map[string]struct{})
-	for _, node := range exchanges {
-		//node.ItemStyle = newExchangeNode("").ItemStyle
-		nodes = append(nodes, newNode(node.Name, exchangesIndex))
-	}
-
-	for _, node := range tokenOwners {
-		//node.ItemStyle = newOwnerNode("").ItemStyle
-		nodes = append(nodes, newNode(node.Name, ownersIndex))
-	}
 
 	for numCluster, cluster := range cls {
 		if len(cluster.Accounts) == 1 && !showSingleAccounts {
 			continue
 		}
 
-		//clusterNode := opts.GraphNode{Name: fmt.Sprintf("cluster%d", numCluster), ItemStyle: newClusterNode("").ItemStyle}
 		clusterNode := newNode(fmt.Sprintf("cluster%d", numCluster), clustersIndex)
-		nodes = append(nodes, clusterNode)
-
-		for account := range cluster.Accounts {
-			if _, ok := isAdded[account]; !ok {
-				isAdded[account] = struct{}{}
-				nodes = append(nodes, newNode(account, accountsIndex))
-			}
-
-			links = append(links, opts.GraphLink{Source: account, Target: clusterNode.Name})
-		}
 
 		for _, transfers := range cluster.AccountsExchangeTransfers {
 			for _, ts := range transfers {
@@ -136,37 +128,53 @@ func (cls Clusters) GenerateGraph(exchanges map[string]opts.GraphNode, tokenOwne
 				account := ts.TxToDeposit.FromAddress
 				deposit := ts.TxToDeposit.ToAddress
 
-				if _, ok := isAdded[deposit]; !ok {
-					isAdded[deposit] = struct{}{}
-
-					//nodes = append(nodes, opts.GraphNode{Name: deposit, ItemStyle: newDepositNode("").ItemStyle})
-					nodes = append(nodes, newNode(deposit, depositsIndex))
-				}
+				nodesMapping[clusterNode.Name] = clusterNode
 
 				links = append(links, opts.GraphLink{Source: clusterNode.Name, Target: account})
+				nodesMapping[account] = newNode(account, accountsIndex)
+
 				links = append(links, opts.GraphLink{Source: account, Target: deposit})
+				nodesMapping[deposit] = newNode(deposit, depositsIndex)
+
 				links = append(links, opts.GraphLink{Source: deposit, Target: exchange.Name})
+				nodesMapping[exchange.Name] = newNode(exchange.Name, exchangesIndex)
 			}
 		}
 
 		for toAccount, transfers := range cluster.AccountsTokenTransfers {
 			for _, ts := range transfers {
+				if node, ok := tokenOwners[ts.FromAddress]; ok {
+					nodesMapping[ts.FromAddress] = newNode(node.Name, ownersIndex)
+				} else {
+					nodesMapping[ts.FromAddress] = newNode(ts.FromAddress, accountsIndex)
+				}
+
+				if _, ok := nodesMapping[toAccount]; !ok {
+					nodesMapping[toAccount] = newNode(toAccount, accountsIndex)
+				}
+
 				links = append(links, opts.GraphLink{Source: ts.FromAddress, Target: toAccount})
 			}
 		}
 	}
 
-	size := len(nodes) * 20
+	nodes := make([]opts.GraphNode, 0)
+	for _, node := range nodesMapping {
+		nodes = append(nodes, node)
+	}
+
+	size := len(nodes) * 18
 	if size > maxSize {
 		size = maxSize
+	} else if size < minSize {
+		size = minSize
 	}
 
 	sizePx := fmt.Sprintf("%dpx", size)
 
 	graph := charts.NewGraph()
 	graph.SetGlobalOptions(
-		charts.WithTitleOpts(opts.Title{Left: "30%", Title: "Clustering"}),
-		charts.WithLegendOpts(opts.Legend{Show: true, Top: "5%", Left: "30%"}),
+		charts.WithLegendOpts(opts.Legend{Show: true}),
 		charts.WithInitializationOpts(opts.Initialization{
 			Width:  sizePx,
 			Height: sizePx,
@@ -175,7 +183,7 @@ func (cls Clusters) GenerateGraph(exchanges map[string]opts.GraphNode, tokenOwne
 
 	graph.AddSeries("graph", nodes, links,
 		charts.WithGraphChartOpts(
-			opts.GraphChart{Force: &opts.GraphForce{Repulsion: 500},
+			opts.GraphChart{Force: &opts.GraphForce{Repulsion: 80},
 				Categories: getCategories()},
 		),
 	)
@@ -186,9 +194,9 @@ func (cls Clusters) GenerateGraph(exchanges map[string]opts.GraphNode, tokenOwne
 func (cls Clusters) Merge(clusters Clusters) (newClusters Clusters) {
 	merged := make(map[int]*Cluster)
 
-	for j, jCluster := range clusters {
-		merged[j] = jCluster
-	}
+	//for j, jCluster := range clusters {
+	//	merged[j] = jCluster
+	//}
 
 	for _, iCluster := range cls {
 		for j, jCluster := range clusters {

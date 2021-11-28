@@ -1,4 +1,4 @@
-up:
+generate:
 	rm -f ./blockchain_data/*.csv
 	rm -Rdf ./geth/docker-data
 	docker-compose -f ./geth/docker/docker-compose.yml up --build --remove-orphans -V -d
