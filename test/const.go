@@ -8,7 +8,7 @@ const (
 	countExchanges            = 2
 	countCluster              = 5
 	countAccounts             = 75
-	countTransactions         = 1000
+	countTransactions         = 500
 	maxCountAccountsInCluster = 5
 	transactonsPerSecond      = 100
 	mixTokensDepth            = 3

@@ -40,9 +40,6 @@ func (cl *Cluster) Merge(cluster *Cluster) bool {
 }
 
 func (cl *Cluster) merge(cluster *Cluster) {
-	cl.mux.Lock()
-	defer cl.mux.Unlock()
-
 	for acc := range cluster.Accounts {
 		cl.Accounts[acc] = struct{}{}
 
@@ -258,9 +255,9 @@ func (cls Clusters) Merge(clusters Clusters) (newClusters Clusters) {
 		copy(copyCLusters, newClusters)
 
 	Loop:
-		for i, iCluster := range newClusters {
+		for _, iCluster := range newClusters {
 			for j, jCluster := range newClusters {
-				if i == j {
+				if iCluster == jCluster {
 					continue
 				}
 
