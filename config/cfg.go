@@ -21,11 +21,11 @@ type Config struct {
 }
 
 type Blockchain struct {
-	BlocksTable         string `default:"blockchain_data/blocks.csv"`
-	TransactionsTable   string `default:"blockchain_data/transactions.csv"`
-	ExchangesTable      string `default:"blockchain_data/exchanges.csv"`
-	TokenTransfersTable string `default:"blockchain_data/token_transfers.csv"`
-	Logs                string `default:"blockchain_data/logs.csv"`
+	BlocksTable         string `default:"blockchain_data/test/blocks.csv"`
+	TransactionsTable   string `default:"blockchain_data/test/transactions.csv"`
+	ExchangesTable      string `default:"blockchain_data/test/exchanges.csv"`
+	TokenTransfersTable string `default:"blockchain_data/test/token_transfers.csv"`
+	Logs                string `default:"blockchain_data/test/logs.csv"`
 }
 
 type Clustering struct {
@@ -39,7 +39,7 @@ type Log struct {
 
 type Output struct {
 	ShowSingleAccount  bool   `default:"false"`
-	GraphDepositsReuse string `default:"output/deposit_reuse.html"`
+	GraphDepositsReuse string `default:"output/cluster.html"`
 }
 
 func New() (*Config, error) {

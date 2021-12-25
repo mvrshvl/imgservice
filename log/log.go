@@ -41,3 +41,12 @@ func Error(ctx context.Context, args ...interface{}) {
 		log.Println(err)
 	}
 }
+
+func Info(ctx context.Context, args ...interface{}) {
+	err := di.FromContext(ctx).Invoke(func(l *logrus.Entry) {
+		l.Info(args...)
+	})
+	if err != nil {
+		log.Println(err)
+	}
+}

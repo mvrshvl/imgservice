@@ -187,33 +187,13 @@ func closeExchanges(exchanges []*exchange.Exchange) {
 	wg.Wait()
 }
 
-//func addEthToAccount(ctx context.Context, acc *common.Address, amount int64) error {
-//	waitCh := make(chan struct{})
-//
-//	err := startbalance.AddTask(ctx, func(a *account.Account) {
-//		_, err := a.SendTransaction(ctx, acc, amount, true)
-//		if err != nil {
-//			log.Fatal(err)
-//		}
-//
-//		close(waitCh)
-//	})
-//	if err != nil {
-//		return err
-//	}
-//
-//	<-waitCh
-//
-//	return nil
-//}
-
 func createUsers() []*user.User {
-	clustersDepositReuse, err := createEOAs(countCluster, maxCountAccountsInCluster)
+	clusters, err := createEOAs(countCluster, maxCountAccountsInCluster)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	for _, cluster := range clustersDepositReuse {
+	for _, cluster := range clusters {
 		fmt.Println("CLUSTER ACCOUNTS", cluster.GetAccounts())
 	}
 
@@ -222,7 +202,7 @@ func createUsers() []*user.User {
 		log.Fatal(err)
 	}
 
-	return append(accounts, clustersDepositReuse...)
+	return append(accounts, clusters...)
 }
 
 func prepareDeps(ctx context.Context) (context.Context, func()) {
@@ -373,7 +353,7 @@ func selfAuth(ctx context.Context, users []*user.User) error {
 			continue
 		}
 
-		for i := 0; i < countClusterTokens; i++ {
+		for i := 0; i < rand.Intn(maxCountClusterTokens); i++ {
 			_, err := us.DeployContract(ctx, accsCount)
 			if err != nil {
 				return err

@@ -4,14 +4,14 @@ const (
 	commonAmount = 10000000000
 
 	countAirdropTokens        = 1
-	countClusterTokens        = 2
-	countExchanges            = 1
-	countCluster              = 2
-	countAccounts             = 20
-	countTransactions         = 100
-	maxCountAccountsInCluster = 6
+	maxCountClusterTokens     = 1
+	countExchanges            = 2
+	countCluster              = 5
+	countAccounts             = 75
+	countTransactions         = 1000
+	maxCountAccountsInCluster = 5
 	transactonsPerSecond      = 100
-	mixTokensDepth            = 4
+	mixTokensDepth            = 3
 )
 
 func getWriterNodes() []string {

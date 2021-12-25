@@ -9,11 +9,11 @@ import (
 	"github.com/google/uuid"
 	"log"
 	"nir/clustering/blockchain"
-	"nir/config"
 	"nir/test/entity/account"
 	"nir/test/writer"
 	"os"
 	"strings"
+	"sync"
 )
 
 type Exchange struct {
@@ -22,6 +22,8 @@ type Exchange struct {
 	clients    map[common.Address]*exchangeClient
 	incomingTx chan *types.LegacyTx
 	closed     chan struct{}
+
+	wg sync.WaitGroup
 }
 
 type exchangeClient struct {
@@ -62,9 +64,9 @@ func (exch *Exchange) startGettingTxs(ctx context.Context) {
 		}
 	}
 
-	close(exch.closed)
+	exch.wg.Wait()
 
-	fmt.Println("EXCHANGE CLOSED")
+	close(exch.closed)
 }
 
 func (exch *Exchange) Close() {
@@ -112,15 +114,25 @@ func (exch *Exchange) GetEthFromDeposit(ctx context.Context, tx *types.LegacyTx)
 			return err
 		}
 
-		err = account.WaitBalance(ctx, tx.Gas*tx.GasPrice.Uint64()+tx.Value.Uint64(), *tx.To)
-		if err != nil {
-			return err
-		}
+		exch.wg.Add(1)
 
-		_, err = client.deposit.SendTransaction(ctx, exch.account.GetAddress(), tx.Value.Int64(), false)
-		if err != nil {
-			return err
-		}
+		go func() {
+			defer exch.wg.Done()
+
+			err = account.WaitBalance(ctx, tx.Gas*tx.GasPrice.Uint64()+tx.Value.Uint64(), *tx.To)
+			if err != nil {
+				fmt.Println(err)
+
+				return
+			}
+
+			_, err = client.deposit.SendTransaction(ctx, exch.account.GetAddress(), tx.Value.Int64(), true)
+			if err != nil {
+				fmt.Println(err)
+
+				return
+			}
+		}()
 
 		return nil
 	}
@@ -133,11 +145,6 @@ func (exch *Exchange) GetAccounts() (addresses []*common.Address) {
 }
 
 func SaveExchanges(exchanges []*Exchange) error {
-	cfg, err := config.New()
-	if err != nil {
-		return err
-	}
-
 	var exchs blockchain.Exchanges
 	for _, exch := range exchanges {
 		exchs = append(exchs, &blockchain.Exchange{
@@ -148,7 +155,7 @@ func SaveExchanges(exchanges []*Exchange) error {
 		})
 	}
 
-	f, err := os.Create(cfg.ExchangesTable)
+	f, err := os.Create("blockchain_data/test/exchanges.csv")
 	if err != nil {
 		return err
 	}

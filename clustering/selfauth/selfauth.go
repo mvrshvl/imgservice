@@ -15,7 +15,7 @@ func Find(approves blockchain.ERC20Approves) clustering.Clusters {
 	addresses := getAddresses(approves)
 
 	for address, addressApproves := range addresses {
-		if len(addressApproves.fromApprove) > 10 || len(addressApproves.toApprove) > 10 {
+		if len(addressApproves.fromApprove) > 10 || len(addressApproves.toApprove) > 10 || len(addressApproves.fromApprove) > 5 || len(addressApproves.toApprove) > 5 {
 			delete(addresses, address)
 		}
 	}

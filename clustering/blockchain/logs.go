@@ -68,7 +68,7 @@ func (logs Logs) ToApproves(txs Transactions) (erc20Approves ERC20Approves, err 
 			for _, in := range inputInterface {
 				switch input := in.(type) {
 				case common.Address:
-					approve.ToAddress = input.String()
+					approve.ToAddress = strings.ToLower(input.String())
 				}
 			}
 

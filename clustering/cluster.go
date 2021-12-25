@@ -6,6 +6,7 @@ import (
 	"github.com/go-echarts/go-echarts/v2/opts"
 	"nir/clustering/blockchain"
 	"nir/clustering/transfer"
+	"sync"
 )
 
 type Cluster struct {
@@ -13,6 +14,8 @@ type Cluster struct {
 	AccountsExchangeTransfers map[string][]*transfer.ExchangeTransfer
 	AccountsTokenTransfers    map[string][]*transfer.TokenTransfer
 	TokensAuth                map[string]map[string]*blockchain.ERC20Approve
+
+	mux sync.Mutex
 }
 
 type Clusters []*Cluster
@@ -22,6 +25,9 @@ func NewCluster() *Cluster {
 }
 
 func (cl *Cluster) Merge(cluster *Cluster) bool {
+	cl.mux.Lock()
+	defer cl.mux.Unlock()
+
 	for acc := range cluster.Accounts {
 		if _, ok := cl.Accounts[acc]; ok {
 			cl.merge(cluster)
@@ -34,6 +40,9 @@ func (cl *Cluster) Merge(cluster *Cluster) bool {
 }
 
 func (cl *Cluster) merge(cluster *Cluster) {
+	cl.mux.Lock()
+	defer cl.mux.Unlock()
+
 	for acc := range cluster.Accounts {
 		cl.Accounts[acc] = struct{}{}
 
@@ -60,20 +69,22 @@ func (cl *Cluster) merge(cluster *Cluster) {
 }
 
 const (
-	depositsIndex  = 1
-	accountsIndex  = 2
-	clustersIndex  = 3
-	ownersIndex    = 4
-	exchangesIndex = 5
+	depositsIndex      = 1
+	accountsIndex      = 2
+	clustersIndex      = 3
+	ownersIndex        = 4
+	exchangesIndex     = 5
+	selfAuthTokenIndex = 6
 )
 
 func getNodeTypes() map[int]string {
 	return map[int]string{
-		accountsIndex:  "Accounts",
-		depositsIndex:  "Deposits",
-		clustersIndex:  "Clusters",
-		ownersIndex:    "Owners",
-		exchangesIndex: "Exchanges",
+		accountsIndex:      "Accounts",
+		depositsIndex:      "Deposits",
+		clustersIndex:      "Clusters",
+		ownersIndex:        "Token distributors",
+		exchangesIndex:     "Exchanges",
+		selfAuthTokenIndex: "SelfAuth ERC20",
 	}
 }
 
@@ -108,7 +119,6 @@ const (
 func (cls Clusters) GenerateGraph(exchanges map[string]opts.GraphNode, tokenOwners map[string]opts.GraphNode, showSingleAccounts bool) *charts.Graph {
 	nodesMapping := make(map[string]opts.GraphNode)
 
-	//nodes := make([]opts.GraphNode, 0)
 	links := make([]opts.GraphLink, 0)
 
 	for numCluster, cluster := range cls {
@@ -156,14 +166,29 @@ func (cls Clusters) GenerateGraph(exchanges map[string]opts.GraphNode, tokenOwne
 				links = append(links, opts.GraphLink{Source: ts.FromAddress, Target: toAccount})
 			}
 		}
+
+		for token, a := range cluster.TokensAuth {
+			for _, b := range a {
+				nodesMapping[token] = newNode(token, selfAuthTokenIndex)
+				nodesMapping[b.FromAddress] = newNode(b.FromAddress, accountsIndex)
+				nodesMapping[b.ToAddress] = newNode(b.ToAddress, accountsIndex)
+
+				links = append(links, opts.GraphLink{Source: token, Target: b.FromAddress})
+				links = append(links, opts.GraphLink{Source: b.FromAddress, Target: b.ToAddress})
+			}
+		}
 	}
 
+	return generateGraph(nodesMapping, links)
+}
+
+func generateGraph(nodesMapping map[string]opts.GraphNode, links []opts.GraphLink) *charts.Graph {
 	nodes := make([]opts.GraphNode, 0)
 	for _, node := range nodesMapping {
 		nodes = append(nodes, node)
 	}
 
-	size := len(nodes) * 18
+	size := len(nodes) * 8
 	if size > maxSize {
 		size = maxSize
 	} else if size < minSize {
@@ -194,19 +219,33 @@ func (cls Clusters) GenerateGraph(exchanges map[string]opts.GraphNode, tokenOwne
 func (cls Clusters) Merge(clusters Clusters) (newClusters Clusters) {
 	merged := make(map[int]*Cluster)
 
-	//for j, jCluster := range clusters {
-	//	merged[j] = jCluster
-	//}
-
+	var (
+		mtx sync.Mutex
+		wg  sync.WaitGroup
+	)
 	for _, iCluster := range cls {
-		for j, jCluster := range clusters {
-			if ok := iCluster.Merge(jCluster); ok {
-				merged[j] = jCluster
-			}
-		}
+		iCluster := iCluster
 
-		newClusters = append(newClusters, iCluster)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+
+			for j, jCluster := range clusters {
+				if ok := iCluster.Merge(jCluster); ok {
+					mtx.Lock()
+					merged[j] = jCluster
+					mtx.Unlock()
+				}
+			}
+
+			mtx.Lock()
+			newClusters = append(newClusters, iCluster)
+			mtx.Unlock()
+
+		}()
 	}
+
+	wg.Wait()
 
 	for j, jCluster := range clusters {
 		if _, ok := merged[j]; !ok {

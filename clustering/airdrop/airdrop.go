@@ -1,7 +1,6 @@
 package airdrop
 
 import (
-	"fmt"
 	"nir/amlerror"
 	"nir/clustering"
 	"nir/clustering/blockchain"
@@ -17,8 +16,8 @@ const (
 func Find(tokenTransfers blockchain.TokenTransfers) (clusters clustering.Clusters, err error) {
 	owners := GetOwners(tokenTransfers)
 
-	for _, owner := range owners {
-		ownerTransfers := GetAccountsByTransfers(tokenTransfers, owner)
+	for contract, owner := range owners {
+		ownerTransfers := GetTargetTransactions(tokenTransfers, contract, owner)
 
 		if len(ownerTransfers) < minAirdropAccounts {
 			continue
@@ -95,25 +94,29 @@ func AddTransfersToCluster(cluster *clustering.Cluster, ts map[string]*blockchai
 	}
 }
 
-func GetOwners(tokenTransfers blockchain.TokenTransfers) (owners []string) {
+func GetOwners(tokenTransfers blockchain.TokenTransfers) (owners map[string]string) {
+	owners = make(map[string]string)
+
 	for _, tokenTransfer := range tokenTransfers {
 		if tokenTransfer.SourceAddress == address0 {
-			owners = append(owners, tokenTransfer.TargetAddress)
+			owners[tokenTransfer.ContractAddress] = tokenTransfer.TargetAddress
 		}
 	}
 
 	return owners
 }
 
-func GetAccountsByTransfers(tokenTransfers blockchain.TokenTransfers, distributor string) map[string]*blockchain.TokenTransfer {
+func GetTargetTransactions(tokenTransfers blockchain.TokenTransfers, contract, distributor string) map[string]*blockchain.TokenTransfer {
 	addresses := make(map[string]*blockchain.TokenTransfer)
 
 	for _, tokenTransfer := range tokenTransfers {
-		if tokenTransfer.SourceAddress == distributor {
+		if tokenTransfer.SourceAddress == distributor && tokenTransfer.ContractAddress == contract {
 			addresses[tokenTransfer.TargetAddress] = tokenTransfer
 		}
 	}
 
+	// filter by value
+	// filter by date
 	return addresses
 }
 
@@ -121,14 +124,14 @@ func getAirdropAccountsWithTransfers(tokenTransfers blockchain.TokenTransfers, a
 	accountsTransfers := make(map[string]map[string]*blockchain.TokenTransfer)
 
 	for acc := range airdropAccounts {
-		accountsTransfers[acc] = map[string]*blockchain.TokenTransfer{airdropAccounts[acc].SourceAddress: airdropAccounts[acc]} //add transfer from distributor
+		accountsTransfers[acc] = map[string]*blockchain.TokenTransfer{airdropAccounts[acc].SourceAddress: airdropAccounts[acc]} //add t from distributor
 	}
 
-	for acc := range airdropAccounts {
-		targetsTransfers := GetAccountsByTransfers(tokenTransfers, acc)
+	for acc, t := range airdropAccounts {
+		targetsTransfers := GetTargetTransactions(tokenTransfers, t.ContractAddress, acc)
 		for target, tr := range targetsTransfers {
 			if _, ok := accountsTransfers[target]; !ok {
-				fmt.Println()
+				accountsTransfers[target] = make(map[string]*blockchain.TokenTransfer)
 			}
 
 			accountsTransfers[target][acc] = tr
@@ -141,8 +144,8 @@ func getAirdropAccountsWithTransfers(tokenTransfers blockchain.TokenTransfers, a
 func GetAirdropDistributors(tokenTransfers blockchain.TokenTransfers) (distributors []string) {
 	owners := GetOwners(tokenTransfers)
 
-	for _, owner := range owners {
-		ownerTransfers := GetAccountsByTransfers(tokenTransfers, owner)
+	for contract, owner := range owners {
+		ownerTransfers := GetTargetTransactions(tokenTransfers, contract, owner)
 
 		if len(ownerTransfers) > minAirdropAccounts {
 			distributors = append(distributors, owner)
