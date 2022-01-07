@@ -4,3 +4,10 @@ clustering:
 
 log:
   level: info
+
+database:
+  address : "127.0.0.1:3307"
+  user : "admin"
+  password : "admin"
+  name : "test"
+  driver : "mysql"

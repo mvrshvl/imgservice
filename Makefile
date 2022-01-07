@@ -1,9 +1,9 @@
 generate:
 	rm -f ./blockchain_data/*.csv
 	rm -Rdf ./geth/docker-data
-	docker-compose -f ./geth/docker/docker-compose.yml up --build --remove-orphans -V -d
+	docker-compose -f ./test/geth/docker/docker-compose.yml up --build --remove-orphans -V -d
 	go run ./test
-	docker-compose -f ./geth/docker/docker-compose.yml down
+	docker-compose -f ./test/geth/docker/docker-compose.yml down
 	chmod -R 777 blockchain_data
 
 down:

@@ -2,7 +2,6 @@ package config
 
 import (
 	"fmt"
-	"github.com/mcuadros/go-defaults"
 	"github.com/mitchellh/mapstructure"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
@@ -18,6 +17,7 @@ type Config struct {
 	Clustering
 	Log
 	Output
+	Database
 }
 
 type Blockchain struct {
@@ -84,4 +84,13 @@ func duration(_ reflect.Type, t reflect.Type, data interface{}) (interface{}, er
 	}
 
 	return time.ParseDuration(data.(string))
+}
+
+type Database struct {
+	Address  string `default:"127.0.0.1:3307"`
+	User     string `default:"admin"`
+	Password string `default:"admin"`
+	Name     string `default:"test"`
+	Driver   string `default:"mysql"`
+	Clean    bool   `default:"false"`
 }
