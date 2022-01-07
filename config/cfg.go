@@ -21,11 +21,11 @@ type Config struct {
 }
 
 type Blockchain struct {
-	BlocksTable         string `default:"blockchain_data/test/blocks.csv"`
-	TransactionsTable   string `default:"blockchain_data/test/transactions.csv"`
-	ExchangesTable      string `default:"blockchain_data/test/exchanges.csv"`
-	TokenTransfersTable string `default:"blockchain_data/test/token_transfers.csv"`
-	Logs                string `default:"blockchain_data/test/logs.csv"`
+	BlocksTable         string `default:"blockchain_data/mainnet/blocks.csv"`
+	TransactionsTable   string `default:"blockchain_data/mainnet/transactions.csv"`
+	ExchangesTable      string `default:"blockchain_data/mainnet/exchanges.csv"`
+	TokenTransfersTable string `default:"blockchain_data/mainnet/token_transfers.csv"`
+	Logs                string `default:"blockchain_data/mainnet/logs.csv"`
 }
 
 type Clustering struct {

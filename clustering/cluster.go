@@ -15,7 +15,7 @@ type Cluster struct {
 	AccountsTokenTransfers    map[string][]*transfer.TokenTransfer
 	TokensAuth                map[string]map[string]*blockchain.ERC20Approve
 
-	mux sync.Mutex
+	mux sync.RWMutex
 }
 
 type Clusters []*Cluster
@@ -27,6 +27,9 @@ func NewCluster() *Cluster {
 func (cl *Cluster) Merge(cluster *Cluster) bool {
 	cl.mux.Lock()
 	defer cl.mux.Unlock()
+
+	cluster.mux.RLock()
+	defer cluster.mux.RUnlock()
 
 	for acc := range cluster.Accounts {
 		if _, ok := cl.Accounts[acc]; ok {
