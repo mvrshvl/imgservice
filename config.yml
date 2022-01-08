@@ -6,9 +6,9 @@ log:
   level: info
 
 database:
-  address : "127.0.0.1:3307"
+  address : "127.0.0.1:3306"
   user : "root"
-  password : "admin"
+  password : "testPASS25!"
   name : "test"
   driver : "mysql"
 

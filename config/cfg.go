@@ -14,20 +14,11 @@ import (
 const ConfigPath = "./config"
 
 type Config struct {
-	Blockchain
 	Clustering
 	Log
 	Output
 	Database
 	Ethereum
-}
-
-type Blockchain struct {
-	BlocksTable         string `default:"blockchain_data/test/big_data/blocks.csv"`
-	TransactionsTable   string `default:"blockchain_data/test/big_data/transactions.csv"`
-	ExchangesTable      string `default:"blockchain_data/test/big_data/exchanges.csv"`
-	TokenTransfersTable string `default:"blockchain_data/test/big_data/token_transfers.csv"`
-	Logs                string `default:"blockchain_data/test/big_data/logs.csv"`
 }
 
 type Clustering struct {
@@ -98,5 +89,5 @@ type Database struct {
 	Password string `default:"admin"`
 	Name     string `default:"test"`
 	Driver   string `default:"mysql"`
-	Clean    bool   `default:"false"`
+	Clean    bool   `default:"true"`
 }

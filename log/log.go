@@ -50,3 +50,12 @@ func Info(ctx context.Context, args ...interface{}) {
 		log.Println(err)
 	}
 }
+
+func Warn(ctx context.Context, args ...interface{}) {
+	err := di.FromContext(ctx).Invoke(func(l *logrus.Entry) {
+		l.Warn(args...)
+	})
+	if err != nil {
+		log.Println(err)
+	}
+}

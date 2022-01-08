@@ -10,8 +10,10 @@ CREATE TABLE IF NOT EXISTS blocks
     gasLimit INTEGER,
     gasUsed  INTEGER,
     blockTimestamp TIMESTAMP,
-    transactionsCount INT UNSIGNED
+    transactionsCount INT
 );
+
+INSERT INTO blocks(number) values(0);
 
 CREATE TABLE IF NOT EXISTS transactions
 (
@@ -34,7 +36,12 @@ CREATE TABLE IF NOT EXISTS transactions
 CREATE TABLE IF NOT EXISTS exchanges
 (
     address BINARY(20) PRIMARY KEY,
-    name VARCHAR(100),
+    name VARCHAR(100)
+);
+
+CREATE TABLE IF NOT EXISTS clusters
+(
+    id INT AUTO_INCREMENT PRIMARY KEY
 );
 
 CREATE TABLE IF NOT EXISTS accounts
@@ -46,14 +53,9 @@ CREATE TABLE IF NOT EXISTS accounts
     FOREIGN KEY (cluster) REFERENCES clusters(id)
 );
 
-CREATE TABLE IF NOT EXISTS clusters
-(
-    id INT AUTO_INCREMENT
-);
-
 -- +migrate Down
-DROP TABLE IF EXISTS blocks;
 DROP TABLE IF EXISTS transactions;
+DROP TABLE IF EXISTS blocks;
 
 DROP TABLE IF EXISTS exchanges;
 DROP TABLE IF EXISTS accounts;

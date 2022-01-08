@@ -4,6 +4,7 @@ import (
 	"context"
 	"embed"
 	"fmt"
+	_ "github.com/go-sql-driver/mysql"
 	"github.com/jmoiron/sqlx"
 	migrate "github.com/rubenv/sql-migrate"
 	"io/fs"
@@ -25,6 +26,11 @@ func New() *Database {
 
 func (db *Database) Connect(ctx context.Context) error {
 	return di.FromContext(ctx).Invoke(func(cfg *config.Config) error {
+		err := db.connect(ctx, cfg, "%s:%s@tcp(%s)/%s?parseTime=true")
+		if err != nil {
+			return err
+		}
+
 		if cfg.Database.Clean {
 			err := db.migrate(cfg, migrate.Down)
 			if err != nil {
@@ -32,12 +38,7 @@ func (db *Database) Connect(ctx context.Context) error {
 			}
 		}
 
-		err := db.migrate(cfg, migrate.Up)
-		if err != nil {
-			return err
-		}
-
-		return db.connect(ctx, cfg, "%s:%s@tcp(%s)/%s?parseTime=true")
+		return db.migrate(cfg, migrate.Up)
 	})
 }
 
@@ -59,8 +60,6 @@ func (db *Database) connect(ctx context.Context, cfg *config.Config, dsn string)
 	if err != nil {
 		return fmt.Errorf("failed to connect db: %w", err)
 	}
-
-	db.connection.Close()
 
 	return nil
 }
