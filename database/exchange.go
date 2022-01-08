@@ -1,4 +1,4 @@
-package blockchain
+package database
 
 type Exchange struct {
 	Address string `csv:"address"`

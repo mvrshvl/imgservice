@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"github.com/mcuadros/go-defaults"
 	"github.com/mitchellh/mapstructure"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
@@ -18,14 +19,15 @@ type Config struct {
 	Log
 	Output
 	Database
+	Ethereum
 }
 
 type Blockchain struct {
-	BlocksTable         string `default:"blockchain_data/mainnet/blocks.csv"`
-	TransactionsTable   string `default:"blockchain_data/mainnet/transactions.csv"`
-	ExchangesTable      string `default:"blockchain_data/mainnet/exchanges.csv"`
-	TokenTransfersTable string `default:"blockchain_data/mainnet/token_transfers.csv"`
-	Logs                string `default:"blockchain_data/mainnet/logs.csv"`
+	BlocksTable         string `default:"blockchain_data/test/big_data/blocks.csv"`
+	TransactionsTable   string `default:"blockchain_data/test/big_data/transactions.csv"`
+	ExchangesTable      string `default:"blockchain_data/test/big_data/exchanges.csv"`
+	TokenTransfersTable string `default:"blockchain_data/test/big_data/token_transfers.csv"`
+	Logs                string `default:"blockchain_data/test/big_data/logs.csv"`
 }
 
 type Clustering struct {
@@ -40,6 +42,10 @@ type Log struct {
 type Output struct {
 	ShowSingleAccount  bool   `default:"false"`
 	GraphDepositsReuse string `default:"output/cluster.html"`
+}
+
+type Ethereum struct {
+	Address string `default:"false"`
 }
 
 func New() (*Config, error) {

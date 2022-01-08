@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"github.com/jmoiron/sqlx"
 	migrate "github.com/rubenv/sql-migrate"
+	"io/fs"
 	"net/http"
 	"nir/config"
 	"nir/di"
-	"strings"
 )
 
 //go:embed migrations/*.sql
@@ -26,13 +26,13 @@ func New() *Database {
 func (db *Database) Connect(ctx context.Context) error {
 	return di.FromContext(ctx).Invoke(func(cfg *config.Config) error {
 		if cfg.Database.Clean {
-			err := db.recreate(ctx, cfg)
+			err := db.migrate(cfg, migrate.Down)
 			if err != nil {
 				return err
 			}
 		}
 
-		err := db.migrate(ctx)
+		err := db.migrate(cfg, migrate.Up)
 		if err != nil {
 			return err
 		}
@@ -41,26 +41,15 @@ func (db *Database) Connect(ctx context.Context) error {
 	})
 }
 
-func (db *Database) recreate(ctx context.Context, cfg *config.Config) error {
-	err := db.connect(ctx, cfg, "%s:%s@tcp(%s)/")
+func (db *Database) migrate(cfg *config.Config, direction migrate.MigrationDirection) error {
+	migrationsDirectory, err := fs.Sub(migrationsPath, "migrations")
 	if err != nil {
 		return err
 	}
 
-	_, err = db.connection.Query("DROP DATABASE ?", cfg.Name)
-	if err != nil {
-		return err
-	}
+	migrations := &migrate.HttpFileSystemMigrationSource{FileSystem: http.FS(migrationsDirectory)}
 
-	_, err = db.connection.Query("CREATE DATABASE ?", cfg.Name)
-
-	return err
-}
-
-func (db *Database) migrate(ctx context.Context) error {
-	migrations := &migrate.HttpFileSystemMigrationSource{FileSystem: http.FS(dir)}
-
-	_, err := migrate.Exec(db.connection.DB, cfg.GetDatabase().DriverName, migrations, migrate.Up)
+	_, err = migrate.Exec(db.connection.DB, cfg.Database.Driver, migrations, direction)
 
 	return err
 }

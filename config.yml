@@ -7,7 +7,10 @@ log:
 
 database:
   address : "127.0.0.1:3307"
-  user : "admin"
+  user : "root"
   password : "admin"
   name : "test"
   driver : "mysql"
+
+ethereum:
+  address : "ws://localhost:59048"

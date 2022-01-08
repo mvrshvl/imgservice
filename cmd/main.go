@@ -14,11 +14,16 @@ import (
 	"nir/clustering/selfauth"
 	"nir/clustering/transfer"
 	"nir/config"
+	"nir/database"
 	"nir/di"
+	"nir/geth"
 	logging "nir/log"
 	"os"
 	"sync"
+	"time"
 )
+
+const batchBlocksSize = 10
 
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -27,12 +32,19 @@ func main() {
 	container, err := di.BuildContainer(
 		config.New,
 		logging.New,
+		database.New,
+		geth.New,
 	)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	ctx = di.WithContext(ctx, container)
+
+	_, err = loadData(ctx)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	logging.Info(ctx, "Prepare data...")
 
@@ -122,6 +134,78 @@ func main() {
 	err = RenderGraph(airdrop.GetAirdropDistributors(chain.TokenTransfers), chain.Exchanges, cfg.Output.GraphDepositsReuse, merged, cfg.ShowSingleAccount)
 	if err != nil {
 		log.Fatal(err)
+	}
+}
+
+func loadData(ctx context.Context) (chan *database.NewBlocks, error) {
+	notifyBlock := make(chan *database.NewBlocks, 1000)
+
+	err := di.FromContext(ctx).Invoke(func(db *database.Database) error {
+		innerErr := db.Connect(ctx)
+		if innerErr != nil {
+			return innerErr
+		}
+
+		dbBlockNum, innerErr := db.GetLastBlock(ctx)
+		if innerErr != nil {
+			return innerErr
+		}
+
+		go collectData(ctx, dbBlockNum, notifyBlock)
+
+		return nil
+	})
+
+	return notifyBlock, err
+}
+
+func collectData(ctx context.Context, fromBlock uint64, notifyChan chan *database.NewBlocks) {
+	ticker := time.NewTicker(time.Second * 5)
+	defer ticker.Stop()
+
+	var ethLastBlock uint64
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+		}
+
+		err := di.FromContext(ctx).Invoke(func(w *geth.Worker) (innerErr error) {
+			ethLastBlock, innerErr = w.GetLastBlock(ctx)
+			return
+		})
+		if err != nil {
+			logging.Error(ctx, err)
+			return
+		}
+
+		if ethLastBlock-fromBlock < batchBlocksSize {
+			continue
+		}
+
+		blocks, err := geth.DownloadData(ctx, fromBlock, ethLastBlock)
+		if err != nil {
+			logging.Error(ctx, err)
+			return
+		}
+
+		err = blocks.Save(ctx)
+		if err != nil {
+			logging.Error(ctx, err)
+			return
+		}
+
+		select {
+		case notifyChan <- blocks:
+		default:
+			logging.Error(ctx, "can't send newBlocks to clustering")
+
+			continue
+		}
+
+		fromBlock += batchBlocksSize
 	}
 }
 

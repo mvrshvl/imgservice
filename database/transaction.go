@@ -1,4 +1,4 @@
-package blockchain
+package database
 
 type Transaction struct {
 	Hash             string  `csv:"hash"`
