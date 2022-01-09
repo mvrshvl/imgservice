@@ -19,15 +19,13 @@ CREATE TABLE IF NOT EXISTS transactions
 (
     hash            BINARY(32) PRIMARY KEY,
     nonce           INT,
-    blockHash       BINARY(32),
     blockNumber     INT UNSIGNED,
     fromAddress     BINARY(20),
     toAddress       BINARY(20),
     value           INTEGER,
     gas             INTEGER,
     gasPrice        INTEGER,
-    blockTimestamp  TIMESTAMP,
-    contractAddress     BINARY(20),
+    contractAddress BINARY(20),
     event           ENUM('transfer', 'approve'),
 
     FOREIGN KEY (blockNumber) REFERENCES blocks(number)
