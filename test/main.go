@@ -33,6 +33,14 @@ func main() {
 
 	log.Println("Creating entities...")
 	users, exchanges, err := createEntitiesWithEther(ctx)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = exchange.SaveExchanges(exchanges)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	log.Println("Start airdrop...")
 
@@ -57,12 +65,6 @@ func main() {
 	log.Println("Closing exchanges...")
 
 	closeExchanges(exchanges)
-
-	log.Println("Saving blockchain...")
-	err = saveBlockchain(ctx, exchanges)
-	if err != nil {
-		log.Fatal(err)
-	}
 }
 
 func addEtherToEntities(ctx context.Context, exchanges []*exchange.Exchange, users []*user.User) error {
@@ -326,7 +328,7 @@ func saveBlockchain(ctx context.Context, exchanges []*exchange.Exchange) error {
 		return fmt.Errorf("%w: stderr = %q, stdout = %q", err, stderr.String(), stdout.String())
 	}
 
-	return exchange.SaveExchanges(exchanges)
+	return nil
 }
 
 func createEntitiesWithEther(ctx context.Context) ([]*user.User, []*exchange.Exchange, error) {

@@ -1,6 +1,10 @@
 package database
 
-import "context"
+import (
+	"context"
+	"github.com/ethereum/go-ethereum/common"
+	"time"
+)
 
 type Block struct {
 	Number           uint64 `csv:"number" db:"number"`
@@ -10,7 +14,7 @@ type Block struct {
 	Miner            string `csv:"miner" db:"miner"`
 	GasLimit         uint64 `csv:"gas_limit" db:"gasLimit"`
 	GasUsed          uint64 `csv:"gas_used" db:"gasUsed"`
-	Timestamp        string `csv:"timestamp" db:"blockTimestamp"`
+	Timestamp        int64  `csv:"timestamp" db:"blockTimestamp"`
 	TransactionCount uint64 `csv:"transaction_count" db:"transactionsCount"`
 }
 
@@ -30,7 +34,7 @@ func (db *Database) AddBlock(ctx context.Context, block *Block) error {
 	_, err := db.connection.ExecContext(ctx,
 		`INSERT INTO blocks(number, hash, parentHash, nonce, miner, gasLimit, gasUsed, blockTimestamp, transactionsCount)
     			VALUES(?,?,?,?,?,?,?,?,?)`,
-		block.Number, block.Hash, block.ParentHash, block.Nonce, block.Miner, block.GasLimit, block.GasUsed, block.Timestamp, block.TransactionCount)
+		block.Number, common.HexToHash(block.Hash).Bytes(), common.HexToHash(block.ParentHash), block.Nonce, common.HexToAddress(block.Miner).Bytes(), block.GasLimit, block.GasUsed, time.Unix(block.Timestamp, 0), block.TransactionCount)
 
 	return err
 }
@@ -45,3 +49,11 @@ func (db *Database) AddBlocks(ctx context.Context, blocks Blocks) error {
 
 	return nil
 }
+
+//func cutAddress(hash string, length int) string {
+//	if len(hash) == length+2 {
+//		return hash[2:]
+//	}
+//
+//	return hash
+//}

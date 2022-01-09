@@ -2,8 +2,10 @@ generate:
 	rm -Rdf ./test/geth/docker-data
 	docker-compose -f ./test/geth/docker/docker-compose.yml up --build --remove-orphans -V -d
 	go run ./test
-	docker-compose -f ./test/geth/docker/docker-compose.yml down
 	chmod -R 777 blockchain_data
+
+stop-generate:
+	docker-compose -f ./test/geth/docker/docker-compose.yml down
 
 down:
 	cd ./geth/docker && docker-compose down

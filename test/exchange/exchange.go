@@ -8,7 +8,7 @@ import (
 	"github.com/gocarina/gocsv"
 	"github.com/google/uuid"
 	"log"
-	"nir/clustering/blockchain"
+	"nir/database"
 	"nir/test/entity/account"
 	"nir/test/writer"
 	"os"
@@ -145,17 +145,15 @@ func (exch *Exchange) GetAccounts() (addresses []*common.Address) {
 }
 
 func SaveExchanges(exchanges []*Exchange) error {
-	var exchs blockchain.Exchanges
+	var exchs database.Exchanges
 	for _, exch := range exchanges {
-		exchs = append(exchs, &blockchain.Exchange{
-			Address:     strings.ToLower(exch.account.GetAddress().String()),
-			Name:        exch.GetName(),
-			AccountType: "eoa",
-			Type:        "Exchange",
+		exchs = append(exchs, &database.Exchange{
+			Address: strings.ToLower(exch.account.GetAddress().String()),
+			Name:    exch.GetName(),
 		})
 	}
 
-	f, err := os.Create("blockchain_data/test/exchanges.csv")
+	f, err := os.Create("geth/data/exchanges.csv")
 	if err != nil {
 		return err
 	}

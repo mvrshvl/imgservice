@@ -2,10 +2,12 @@ package geth
 
 import (
 	"context"
+	"errors"
 	"github.com/gocarina/gocsv"
 	"nir/config"
 	"nir/database"
 	"nir/di"
+	logging "nir/log"
 	"os"
 	"os/exec"
 	"path"
@@ -17,6 +19,10 @@ const dataDirectory = "./geth/data"
 func DownloadData(ctx context.Context, fromBlock, toBlock uint64) (*database.NewBlocks, error) {
 	err := di.FromContext(ctx).Invoke(func(cfg *config.Config) error {
 		cmd := exec.Command("bash", "./geth/download.sh", strconv.FormatUint(fromBlock, 10), strconv.FormatUint(toBlock, 10), cfg.Ethereum.Address)
+
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = cmd.Stdout
+
 		return cmd.Run()
 	})
 	if err != nil {
@@ -36,17 +42,17 @@ func parseNewBlocks(ctx context.Context) (*database.NewBlocks, error) {
 	)
 
 	err := di.FromContext(ctx).Invoke(func(c *config.Config) error {
-		err := parseCSV(path.Join(dataDirectory, "blocks.csv"), &blocks)
+		err := parseCSV(path.Join(dataDirectory, "exchanges.csv"), &exchanges)
+		if err != nil {
+			logging.Warn(ctx, "exchanges file not found")
+		}
+
+		err = parseCSV(path.Join(dataDirectory, "blocks.csv"), &blocks)
 		if err != nil {
 			return err
 		}
 
 		err = parseCSV(path.Join(dataDirectory, "transactions.csv"), &txs)
-		if err != nil {
-			return err
-		}
-
-		err = parseCSV(path.Join(dataDirectory, "exchanges.csv"), &exchanges)
 		if err != nil {
 			return err
 		}
@@ -71,5 +77,10 @@ func parseCSV(filename string, out interface{}) error {
 		return err
 	}
 
-	return gocsv.UnmarshalCSV(gocsv.DefaultCSVReader(f), out)
+	err = gocsv.UnmarshalCSV(gocsv.DefaultCSVReader(f), out)
+	if err != nil && !errors.Is(err, gocsv.ErrEmptyCSVFile) {
+		return err
+	}
+
+	return nil
 }

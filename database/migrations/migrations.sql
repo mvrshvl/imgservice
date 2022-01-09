@@ -3,12 +3,12 @@
 CREATE TABLE IF NOT EXISTS blocks
 (
     number   INT UNSIGNED PRIMARY KEY,
-    hash     BINARY(32),
-    parentHash     BINARY(32),
+    hash     BINARY(64),
+    parentHash     BINARY(64),
     nonce    INT UNSIGNED,
     miner    BINARY(20),
-    gasLimit INTEGER,
-    gasUsed  INTEGER,
+    gasLimit BIGINT,
+    gasUsed  BIGINT,
     blockTimestamp TIMESTAMP,
     transactionsCount INT
 );

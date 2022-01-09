@@ -35,7 +35,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	<-errNotify
+	logging.Info(ctx, <-errNotify)
 	// остановился на тестировании записи в бд
 	//logging.Info(ctx, "Prepare data...")
 	//
@@ -185,7 +185,7 @@ func collectData(ctx context.Context, fromBlock uint64, notifyChan chan *databas
 			continue
 		}
 
-		blocks, err = geth.DownloadData(ctx, fromBlock, ethLastBlock)
+		blocks, err = geth.DownloadData(ctx, fromBlock+1, fromBlock+batchBlocksSize)
 		if err != nil {
 			return
 		}

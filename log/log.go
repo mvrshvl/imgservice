@@ -20,14 +20,14 @@ func New(cfg *config.Config) (*logrus.Entry, error) {
 		return nil, err
 	}
 
-	f, err := os.Create(filepath.Join(logPath, fmt.Sprintf("%s.log", time.Now().String())))
+	_, err = os.Create(filepath.Join(logPath, fmt.Sprintf("%s.log", time.Now().String())))
 	if err != nil {
 		return nil, err
 	}
 
 	logger := logrus.New()
 
-	logger.SetOutput(f)
+	logger.SetOutput(os.Stdin)
 	logger.SetLevel(cfg.Log.Level)
 
 	return logrus.NewEntry(logger), nil

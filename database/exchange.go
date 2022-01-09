@@ -3,7 +3,6 @@ package database
 type Exchange struct {
 	Address string `csv:"address"`
 	Name    string `csv:"name"`
-	Type    string `csv:"type"`
 }
 
 type Exchanges []*Exchange

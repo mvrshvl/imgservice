@@ -1,6 +1,6 @@
 #!/bin/bash
 
-ethereumetl export_blocks_and_transactions -w 20 --start-block "$1" --end-block "$2" --blocks-output  ./geth/data/blocks.csv --transactions-output  ./geth/data/transactions.csv \--provider-uri %3
+ethereumetl export_blocks_and_transactions -w 20 --start-block "$1" --end-block "$2" --blocks-output  ./geth/data/blocks.csv --transactions-output  ./geth/data/transactions.csv \--provider-uri $3
 
 ethereumetl export_token_transfers -w 20 --start-block "$1" --end-block "$2" --output  ./geth/data/token_transfers.csv --provider-uri $3
 

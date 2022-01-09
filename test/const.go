@@ -5,13 +5,13 @@ const (
 
 	countAirdropTokens        = 1
 	maxCountClusterTokens     = 1
-	countExchanges            = 2
-	countCluster              = 5
-	countAccounts             = 75
-	countTransactions         = 500
-	maxCountAccountsInCluster = 5
+	countExchanges            = 1
+	countCluster              = 2
+	countAccounts             = 20
+	countTransactions         = 200
+	maxCountAccountsInCluster = 4
 	transactonsPerSecond      = 100
-	mixTokensDepth            = 3
+	mixTokensDepth            = 2
 )
 
 func getWriterNodes() []string {

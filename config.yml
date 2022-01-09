@@ -13,4 +13,4 @@ database:
   driver : "mysql"
 
 ethereum:
-  address : "ws://localhost:59048"
+  address : "http://localhost:59047"
