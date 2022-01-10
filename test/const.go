@@ -1,7 +1,7 @@
 package main
 
 const (
-	commonAmount = 10000000000
+	commonAmount = 100000000000
 
 	countAirdropTokens        = 1
 	maxCountClusterTokens     = 1

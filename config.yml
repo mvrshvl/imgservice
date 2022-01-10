@@ -3,7 +3,7 @@ clustering:
   maxETHDiff: 0.01
 
 log:
-  level: info
+  level: debug
 
 database:
   address : "127.0.0.1:3306"

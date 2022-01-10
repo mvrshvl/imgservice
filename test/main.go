@@ -42,21 +42,21 @@ func main() {
 		log.Fatal(err)
 	}
 
-	log.Println("Start airdrop...")
-
-	for i := 0; i < countAirdropTokens; i++ {
-		err = airdrop(ctx, users)
-		if err != nil {
-			log.Fatal(err)
-		}
-	}
-
-	log.Println("Start self-auth...")
-
-	err = selfAuth(ctx, users)
-	if err != nil {
-		log.Fatal(err)
-	}
+	//log.Println("Start airdrop...")
+	//
+	//for i := 0; i < countAirdropTokens; i++ {
+	//	err = airdrop(ctx, users)
+	//	if err != nil {
+	//		log.Fatal(err)
+	//	}
+	//}
+	//
+	//log.Println("Start self-auth...")
+	//
+	//err = selfAuth(ctx, users)
+	//if err != nil {
+	//	log.Fatal(err)
+	//}
 
 	log.Println("Start sending transactions to exchange...")
 
@@ -144,7 +144,11 @@ func sendTransactionsToExchange(ctx context.Context, entities []*user.User, exch
 			go func() {
 				defer wg.Done()
 
-				amount := rand.Intn(100)
+				rand.Seed(time.Now().UnixNano())
+				min := 1000000
+				max := 5000000
+
+				amount := rand.Intn(max-min+1) + min
 
 				currentTxNumber := atomic.AddInt32(txsNumbers, 1)
 

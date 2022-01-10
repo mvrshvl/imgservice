@@ -3,10 +3,10 @@
 CREATE TABLE IF NOT EXISTS blocks
 (
     number   INT UNSIGNED PRIMARY KEY,
-    hash     BINARY(64),
-    parentHash     BINARY(64),
+    hash     VARCHAR(66),
+    parentHash VARCHAR(66),
     nonce    INT UNSIGNED,
-    miner    BINARY(20),
+    miner    VARCHAR(42),
     gasLimit BIGINT,
     gasUsed  BIGINT,
     blockTimestamp TIMESTAMP,
@@ -17,24 +17,35 @@ INSERT INTO blocks(number) values(0);
 
 CREATE TABLE IF NOT EXISTS transactions
 (
-    hash            BINARY(32) PRIMARY KEY,
+    hash            VARCHAR(66) PRIMARY KEY,
     nonce           INT,
     blockNumber     INT UNSIGNED,
-    fromAddress     BINARY(20),
-    toAddress       BINARY(20),
-    value           INTEGER,
-    gas             INTEGER,
-    gasPrice        INTEGER,
-    contractAddress BINARY(20),
-    event           ENUM('transfer', 'approve'),
+    transactionIndex INT UNSIGNED,
+    fromAddress     VARCHAR(42),
+    toAddress       VARCHAR(42),
+    value           BIGINT,
+    gas             BIGINT,
+    gasPrice        BIGINT,
+    input           TEXT,
+    contractAddress VARCHAR(42),
+    type            ENUM('transfer', 'approve'),
 
     FOREIGN KEY (blockNumber) REFERENCES blocks(number)
 );
 
 CREATE TABLE IF NOT EXISTS exchanges
 (
-    address BINARY(20) PRIMARY KEY,
+    address VARCHAR(42) PRIMARY KEY,
     name VARCHAR(100)
+);
+
+CREATE TABLE IF NOT EXISTS exchangeTransfers
+(
+    txDeposit VARCHAR(66) PRIMARY KEY,
+    txExchange VARCHAR(66),
+
+    FOREIGN KEY (txDeposit) REFERENCES transactions(hash),
+    FOREIGN KEY (txExchange) REFERENCES transactions(hash)
 );
 
 CREATE TABLE IF NOT EXISTS clusters
@@ -44,7 +55,7 @@ CREATE TABLE IF NOT EXISTS clusters
 
 CREATE TABLE IF NOT EXISTS accounts
 (
-    address BINARY(20) PRIMARY KEY,
+    address VARCHAR(42) PRIMARY KEY,
     accountType ENUM('eoa', 'miner'),
     cluster INT,
 
@@ -52,6 +63,7 @@ CREATE TABLE IF NOT EXISTS accounts
 );
 
 -- +migrate Down
+DROP TABLE IF EXISTS exchangeTransfers;
 DROP TABLE IF EXISTS transactions;
 DROP TABLE IF EXISTS blocks;
 

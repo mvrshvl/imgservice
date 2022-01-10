@@ -2,7 +2,7 @@ package database
 
 import (
 	"context"
-	"github.com/ethereum/go-ethereum/common"
+	"fmt"
 	"time"
 )
 
@@ -24,7 +24,7 @@ func (db *Database) GetLastBlock(ctx context.Context) (uint64, error) {
 	blockNum := new(uint64)
 	err := db.connection.GetContext(ctx, blockNum, "SELECT number FROM blocks ORDER BY number DESC LIMIT 1")
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("can't get last block: %w", err)
 	}
 
 	return *blockNum, nil
@@ -34,9 +34,16 @@ func (db *Database) AddBlock(ctx context.Context, block *Block) error {
 	_, err := db.connection.ExecContext(ctx,
 		`INSERT INTO blocks(number, hash, parentHash, nonce, miner, gasLimit, gasUsed, blockTimestamp, transactionsCount)
     			VALUES(?,?,?,?,?,?,?,?,?)`,
-		block.Number, common.HexToHash(block.Hash).Bytes(), common.HexToHash(block.ParentHash), block.Nonce, common.HexToAddress(block.Miner).Bytes(), block.GasLimit, block.GasUsed, time.Unix(block.Timestamp, 0), block.TransactionCount)
+		block.Number, block.Hash, block.ParentHash, block.Nonce, block.Miner, block.GasLimit, block.GasUsed, time.Unix(block.Timestamp, 0), block.TransactionCount)
+	if err != nil {
+		return fmt.Errorf("can't add block: %w", err)
+	}
 
-	return err
+	return db.AddAccount(ctx, &Account{
+		address: block.Miner,
+		accType: miner,
+		cluster: 0,
+	})
 }
 
 func (db *Database) AddBlocks(ctx context.Context, blocks Blocks) error {
@@ -49,11 +56,3 @@ func (db *Database) AddBlocks(ctx context.Context, blocks Blocks) error {
 
 	return nil
 }
-
-//func cutAddress(hash string, length int) string {
-//	if len(hash) == length+2 {
-//		return hash[2:]
-//	}
-//
-//	return hash
-//}

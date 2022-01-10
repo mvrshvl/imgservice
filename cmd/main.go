@@ -2,16 +2,22 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
+	"nir/clustering"
 	"nir/config"
 	"nir/database"
 	"nir/di"
 	"nir/geth"
 	logging "nir/log"
+	"path"
 	"time"
 )
 
-const batchBlocksSize = 10
+const (
+	batchBlocksSize = 10
+	testRun         = true
+)
 
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -30,11 +36,12 @@ func main() {
 	ctx = di.WithContext(ctx, container)
 
 	errNotify := make(chan error, 1)
-	_, err = loadData(ctx, errNotify)
+	subscriber, err := loadData(ctx, errNotify)
 	if err != nil {
 		log.Fatal(err)
 	}
 
+	go clustering.Run(ctx, subscriber, errNotify)
 	logging.Info(ctx, <-errNotify)
 	// остановился на тестировании записи в бд
 	//logging.Info(ctx, "Prepare data...")
@@ -67,7 +74,7 @@ func main() {
 	//go func() {
 	//	defer wg.Done()
 	//
-	//	ts = transfer.GetExchangeTransfers(chain, cfg.Clustering.MaxBlockDiff)
+	//	ts = transfer.GetTxsToExchange(chain, cfg.Clustering.MaxBlockDiff)
 	//	depositClusters = depositreuse.Find(ts)
 	//
 	//	err = SaveClusters("deposit.json", depositClusters)
@@ -137,6 +144,11 @@ func loadData(ctx context.Context, errNotify chan error) (chan *database.NewBloc
 			return innerErr
 		}
 
+		innerErr = addExchanges(ctx, db)
+		if innerErr != nil {
+			return innerErr
+		}
+
 		dbBlockNum, innerErr := db.GetLastBlock(ctx)
 		if innerErr != nil {
 			return innerErr
@@ -148,6 +160,21 @@ func loadData(ctx context.Context, errNotify chan error) (chan *database.NewBloc
 	})
 
 	return notifyBlock, err
+}
+
+func addExchanges(ctx context.Context, db *database.Database) error {
+	if !testRun {
+		return nil
+	}
+
+	var exchanges database.Exchanges
+
+	err := geth.ParseCSV(path.Join(geth.DataDirectory, "exchanges.csv"), &exchanges)
+	if err != nil {
+		return fmt.Errorf("can't parse exchanges: %w", err)
+	}
+
+	return db.AddExchanges(ctx, exchanges)
 }
 
 func collectData(ctx context.Context, fromBlock uint64, notifyChan chan *database.NewBlocks, errNotify chan error) {
@@ -181,6 +208,8 @@ func collectData(ctx context.Context, fromBlock uint64, notifyChan chan *databas
 			return
 		}
 
+		logging.Infof(ctx, "Current block %d, saved block %d", ethLastBlock, fromBlock)
+
 		if ethLastBlock-fromBlock < batchBlocksSize {
 			continue
 		}
@@ -190,6 +219,7 @@ func collectData(ctx context.Context, fromBlock uint64, notifyChan chan *databas
 			return
 		}
 
+		logging.Infof(ctx, "Imported blocks = %d, txs = %d, transfers = %d, approves = %d", len(blocks.Blocks), len(blocks.Transactions), len(blocks.TokenTransfers), len(blocks.Approves))
 		err = blocks.Save(ctx)
 		if err != nil {
 			return

@@ -51,9 +51,36 @@ func Info(ctx context.Context, args ...interface{}) {
 	}
 }
 
+func Infof(ctx context.Context, format string, args ...interface{}) {
+	err := di.FromContext(ctx).Invoke(func(l *logrus.Entry) {
+		l.Infof(format, args...)
+	})
+	if err != nil {
+		log.Println(err)
+	}
+}
+
 func Warn(ctx context.Context, args ...interface{}) {
 	err := di.FromContext(ctx).Invoke(func(l *logrus.Entry) {
 		l.Warn(args...)
+	})
+	if err != nil {
+		log.Println(err)
+	}
+}
+
+func Debug(ctx context.Context, args ...interface{}) {
+	err := di.FromContext(ctx).Invoke(func(l *logrus.Entry) {
+		l.Debug(args...)
+	})
+	if err != nil {
+		log.Println(err)
+	}
+}
+
+func Debugf(ctx context.Context, format string, args ...interface{}) {
+	err := di.FromContext(ctx).Invoke(func(l *logrus.Entry) {
+		l.Debugf(format, args...)
 	})
 	if err != nil {
 		log.Println(err)

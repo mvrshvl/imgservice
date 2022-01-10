@@ -7,21 +7,17 @@ import (
 	"nir/config"
 	"nir/database"
 	"nir/di"
-	logging "nir/log"
 	"os"
 	"os/exec"
 	"path"
 	"strconv"
 )
 
-const dataDirectory = "./geth/data"
+const DataDirectory = "./geth/data"
 
 func DownloadData(ctx context.Context, fromBlock, toBlock uint64) (*database.NewBlocks, error) {
 	err := di.FromContext(ctx).Invoke(func(cfg *config.Config) error {
 		cmd := exec.Command("bash", "./geth/download.sh", strconv.FormatUint(fromBlock, 10), strconv.FormatUint(toBlock, 10), cfg.Ethereum.Address)
-
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = cmd.Stdout
 
 		return cmd.Run()
 	})
@@ -29,10 +25,10 @@ func DownloadData(ctx context.Context, fromBlock, toBlock uint64) (*database.New
 		return nil, err
 	}
 
-	return parseNewBlocks(ctx)
+	return parseNewBlocks()
 }
 
-func parseNewBlocks(ctx context.Context) (*database.NewBlocks, error) {
+func parseNewBlocks() (*database.NewBlocks, error) {
 	var (
 		blocks         []*database.Block
 		txs            []*database.Transaction
@@ -41,29 +37,22 @@ func parseNewBlocks(ctx context.Context) (*database.NewBlocks, error) {
 		logs           database.Logs
 	)
 
-	err := di.FromContext(ctx).Invoke(func(c *config.Config) error {
-		err := parseCSV(path.Join(dataDirectory, "exchanges.csv"), &exchanges)
-		if err != nil {
-			logging.Warn(ctx, "exchanges file not found")
-		}
+	err := ParseCSV(path.Join(DataDirectory, "blocks.csv"), &blocks)
+	if err != nil {
+		return nil, err
+	}
 
-		err = parseCSV(path.Join(dataDirectory, "blocks.csv"), &blocks)
-		if err != nil {
-			return err
-		}
+	err = ParseCSV(path.Join(DataDirectory, "transactions.csv"), &txs)
+	if err != nil {
+		return nil, err
+	}
 
-		err = parseCSV(path.Join(dataDirectory, "transactions.csv"), &txs)
-		if err != nil {
-			return err
-		}
+	err = ParseCSV(path.Join(DataDirectory, "logs.csv"), &logs)
+	if err != nil {
+		return nil, err
+	}
 
-		err = parseCSV(path.Join(dataDirectory, "logs.csv"), &logs)
-		if err != nil {
-			return err
-		}
-
-		return parseCSV(path.Join(dataDirectory, "token_transfers.csv"), &tokenTransfers)
-	})
+	err = ParseCSV(path.Join(DataDirectory, "token_transfers.csv"), &tokenTransfers)
 	if err != nil {
 		return nil, err
 	}
@@ -71,7 +60,7 @@ func parseNewBlocks(ctx context.Context) (*database.NewBlocks, error) {
 	return database.GetNewBlocks(txs, blocks, exchanges, tokenTransfers, logs)
 }
 
-func parseCSV(filename string, out interface{}) error {
+func ParseCSV(filename string, out interface{}) error {
 	f, err := os.OpenFile(filename, os.O_RDONLY, 0666)
 	if err != nil {
 		return err

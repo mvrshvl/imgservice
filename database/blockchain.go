@@ -35,6 +35,26 @@ func (nb *NewBlocks) Save(ctx context.Context) error {
 			return err
 		}
 
+		err = db.AddTransactions(ctx, nb.Transactions)
+		if err != nil {
+			return err
+		}
+
+		err = db.AddExchanges(ctx, nb.Exchanges)
+		if err != nil {
+			return err
+		}
+
+		err = db.UpdateTokenTransfers(ctx, nb.TokenTransfers)
+		if err != nil {
+			return err
+		}
+
+		err = db.UpdateApproves(ctx, nb.Approves)
+		if err != nil {
+			return err
+		}
+
 		return nil
 	})
 }
