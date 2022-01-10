@@ -6,7 +6,7 @@ import (
 )
 
 type Exchange struct {
-	Address string `csv:"address" db:"address"`
+	Address string `csv:"Address" db:"Address"`
 	Name    string `csv:"name" db:"name"`
 }
 
@@ -23,7 +23,7 @@ func (exchanges Exchanges) MapAddresses() map[string]struct{} {
 
 func (db *Database) AddExchange(ctx context.Context, ex *Exchange) error {
 	_, err := db.connection.ExecContext(ctx,
-		`INSERT INTO exchanges(address, name)
+		`INSERT INTO exchanges(Address, name)
     			VALUES(?,?)`,
 		ex.Address, ex.Name)
 

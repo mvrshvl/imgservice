@@ -17,7 +17,7 @@ type Log struct {
 	Index       string `csv:"transaction_index"`
 	BlockHash   string `csv:"block_hash"`
 	BlockNumber string `csv:"block_number"`
-	Address     string `csv:"address"`
+	Address     string `csv:"Address"`
 	Data        string `csv:"data"`
 	Topics      string `csv:"topics"`
 }

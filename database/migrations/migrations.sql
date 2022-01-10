@@ -56,7 +56,7 @@ CREATE TABLE IF NOT EXISTS clusters
 CREATE TABLE IF NOT EXISTS accounts
 (
     address VARCHAR(42) PRIMARY KEY,
-    accountType ENUM('eoa', 'miner'),
+    accountType ENUM('eoa', 'miner', 'exchange', 'deposit'),
     cluster INT,
 
     FOREIGN KEY (cluster) REFERENCES clusters(id)

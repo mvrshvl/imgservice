@@ -44,18 +44,16 @@ func (db *Database) AddTransaction(ctx context.Context, tx *Transaction) error {
 	}
 
 	err = db.AddAccount(ctx, &Account{
-		address: tx.FromAddress,
-		accType: eoa,
-		cluster: 0,
+		Address: tx.FromAddress,
+		AccType: eoa,
 	})
 	if err != nil {
 		return err
 	}
 
 	return db.AddAccount(ctx, &Account{
-		address: tx.ToAddress,
-		accType: eoa,
-		cluster: 0,
+		Address: tx.ToAddress,
+		AccType: eoa,
 	})
 }
 
@@ -118,9 +116,9 @@ func (db *Database) GetTxsToExchange(ctx context.Context, txs Transactions) (Tra
 	query := `SELECT hash, nonce, blocknumber, fromaddress, toaddress, value, gas, gasprice, input
 					FROM transactions
     				LEFT JOIN exchanges
-    				ON transactions.toAddress = exchanges.address
+    				ON transactions.toAddress = exchanges.Address
 					WHERE hash IN ( ? )
-					  AND exchanges.address IS NOT NULL`
+					  AND exchanges.Address IS NOT NULL`
 
 	queryIn, args, err := sqlx.In(query, hashes)
 	if err != nil {
@@ -136,7 +134,25 @@ func (db *Database) GetTxsToExchange(ctx context.Context, txs Transactions) (Tra
 		return nil, fmt.Errorf("can't get exchange transfers: %w", err)
 	}
 
-	return scanTransactions(rows)
+	txsToExchange, err := scanTransactions(rows)
+	if err != nil {
+		return nil, err
+	}
+
+	// update accounts set deposit and exchange type
+	for _, txToExchange := range txsToExchange {
+		err = db.UpdateAccountType(ctx, txToExchange.FromAddress, deposit)
+		if err != nil {
+			return nil, err
+		}
+
+		err = db.UpdateAccountType(ctx, txToExchange.ToAddress, exchange)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return txsToExchange, nil
 }
 
 func (db *Database) GetExchangeTransfer(ctx context.Context, txsToExchange Transactions, diffBlock uint64, diffGasKoef float64) ([]*ExchangeTransfer, error) {
@@ -184,7 +200,7 @@ func (db *Database) GetExchangeTransfer(ctx context.Context, txsToExchange Trans
 		}
 
 		if len(txs) == 0 {
-			logging.Debugf(ctx, "tx to deposit not found (tx to exchange %s, range blocks %v-%v, range value %v-%v, to address %v)", txToExchange.Hash, minBlock, maxBlock, minValue, txToExchange.Value, txToExchange.ToAddress)
+			logging.Debugf(ctx, "tx to deposit not found (tx to exchange %s, range blocks %v-%v, range value %v-%v, to Address %v)", txToExchange.Hash, minBlock, maxBlock, minValue, txToExchange.Value, txToExchange.ToAddress)
 
 			continue
 		}
