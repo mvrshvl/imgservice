@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"github.com/jmoiron/sqlx"
+	logging "nir/log"
 )
 
 type AccountType string
@@ -85,25 +86,35 @@ func scanAccounts(rows *sql.Rows) ([]*Account, error) {
 	return accounts, nil
 }
 
-func (db *Database) GetSenders(ctx context.Context, address string, excludeAddresses ...string) ([]string, error) {
-	query := `SELECT fromAddress FROM transactions
-				WHERE toAddress = ?`
+func (db *Database) GetDepositSenders(ctx context.Context, address string, excludeAddresses ...string) ([]string, error) {
+	query := `SELECT DISTINCT fromAddress FROM transactions
+				LEFT JOIN accounts
+				ON transactions.fromAddress = accounts.address
+				WHERE toAddress = ?
+				  AND NOT accountType = 'exchange'`
 
 	return db.getAddresses(ctx, query, excludeAddresses, address)
 }
 
-func (db *Database) GetDeposits(ctx context.Context, address string, excludeAddresses ...string) ([]string, error) {
-	query := `SELECT toAddress FROM transactions
-				WHERE fromAddress = ?
-					AND accountType = ?`
+func (db *Database) GetDepositsByAddresses(ctx context.Context, addresses []string, excludeAddresses ...string) ([]string, error) {
+	query := `SELECT DISTINCT transactions.toAddress FROM transactions
+				LEFT JOIN accounts
+				ON transactions.toAddress = accounts.address
+				WHERE accounts.accountType = ?
+				AND transactions.fromAddress IN ( ? )`
 
-	return db.getAddresses(ctx, query, excludeAddresses, address, deposit)
+	queryIn, args, err := sqlx.In(query, deposit, addresses)
+	if err != nil {
+		return nil, fmt.Errorf("can't create IN QUERY: %w", err)
+	}
+
+	return db.getAddresses(ctx, queryIn, excludeAddresses, args...)
 }
 
 func (db *Database) getAddresses(ctx context.Context, query string, excludeAddresses []string, args ...interface{}) ([]string, error) {
 	rows, err := db.connection.QueryContext(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("can't get exchange transfers: %w", err)
+		return nil, fmt.Errorf("can't get addresses: %w", err)
 	}
 
 	defer rows.Close()
@@ -159,6 +170,8 @@ func (db *Database) UpdateClusterByAddress(ctx context.Context, cluster uint64, 
 func (db *Database) UpdateClusterByCluster(ctx context.Context, src, dst uint64) error {
 	query := `UPDATE accounts SET cluster = ? WHERE cluster = ?`
 
+	logging.Debugf(ctx, "merging cluster %v into %v", src, dst)
+
 	_, err := db.connection.ExecContext(ctx, query, dst, src)
 	if err != nil {
 		return fmt.Errorf("can't update cluster by cluster: %w", err)
@@ -185,6 +198,8 @@ func (db *Database) CreateCluster(ctx context.Context) (int64, error) {
 
 func (db *Database) DeleteCluster(ctx context.Context, id uint64) error {
 	query := `DELETE FROM clusters WHERE id = ?`
+
+	logging.Debugf(ctx, "deleting cluster %v", id)
 
 	_, err := db.connection.ExecContext(ctx, query, id)
 	if err != nil {

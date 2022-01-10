@@ -7,6 +7,7 @@ import (
 	"nir/database"
 	"nir/di"
 	logging "nir/log"
+	"sync/atomic"
 )
 
 const errAccounts = amlerror.AMLError("can't get transfer accounts")
@@ -18,99 +19,111 @@ func Run(ctx context.Context, txs database.Transactions) error {
 	}
 
 	for _, transfer := range exchangeTransfers {
-
+		err := clustering(ctx, transfer)
+		if err != nil {
+			return err
+		}
 	}
+
 	return nil
-	//depositsWithSenders := make(map[string]*clustering.Cluster)
-	//
-	//// Поиск депозитов и всех аккаунтов которые отправляли транзакции на данный депозит
-	//for _, t := range transfers {
-	//	if depositsWithSenders[t.TxToDeposit.ToAddress] == nil {
-	//		depositsWithSenders[t.TxToDeposit.ToAddress] = clustering.NewCluster()
-	//	}
-	//
-	//	AddTransfer(depositsWithSenders[t.TxToDeposit.ToAddress], t)
-	//}
-	//
-	//var clusters []*clustering.Cluster
-	//
-	//for deposit, cluster := range depositsWithSenders {
-	//	MergeMatchesExchangeTransfersAccounts(cluster, deposit, depositsWithSenders)
-	//	clusters = append(clusters, cluster)
-	//}
-	//
-	//return clusters
 }
 
 func clustering(ctx context.Context, transfer *database.ExchangeTransfer) error {
 	return di.FromContext(ctx).Invoke(func(db *database.Database) error {
-		txToDeposit, _, innerErr := db.GetTransferTxs(ctx, transfer)
+		sender, deposit, innerErr := getSenderAndDeposit(ctx, db, transfer)
 		if innerErr != nil {
 			return innerErr
 		}
 
-		sender, deposit, innerErr := getSenderAndDeposit(ctx, db, txToDeposit.FromAddress, txToDeposit.ToAddress)
-
-		switch true {
-		case sender.Cluster != nil && deposit.Cluster == nil:
-			senders, innerErr := db.GetSenders(ctx, deposit.Address, sender.Address)
-			if innerErr != nil {
-				return innerErr
-			}
-
-			if len(senders) > 1 {
-				logging.Debugf(ctx, "should be one sender. Senders %v, deposit %s", senders, deposit.Address)
-			}
-
-			// update cluster for deposit and his sender
-			return db.UpdateClusterByAddress(ctx, *sender.Cluster, append(senders, deposit.Address)...)
-		case sender.Cluster == nil && deposit.Cluster != nil:
-			deposits, innerErr := db.GetDeposits(ctx, sender.Address, deposit.Address)
-			if innerErr != nil {
-				return innerErr
-			}
-			// update cluster for sender and his deposits
-			return db.UpdateClusterByAddress(ctx, *deposit.Cluster, append(deposits, sender.Address)...)
-		case sender.Cluster != nil && deposit.Cluster != nil && *sender.Cluster != *deposit.Cluster:
-			return db.MergeClusters(ctx, *deposit.Cluster, *sender.Cluster)
-		//case sender.Cluster != nil && deposit.Cluster != nil && *sender.Cluster == *deposit.Cluster:
-		//	return nil
-		case sender.Cluster == nil && deposit.Cluster == nil:
-			senders, innerErr := db.GetSenders(ctx, deposit.Address, sender.Address)
-			if innerErr != nil {
-				return innerErr
-			}
-
-			if len(senders) == 0 {
-				return nil
-			}
-
-			id, innerErr := db.CreateCluster(ctx)
-			if innerErr != nil {
-				return innerErr
-			}
-
-			// todo set all senders to cluster and their deposits
-		}
-
-		return innerErr
+		return findRelations(ctx, db, sender, deposit)
 	})
 }
 
-func getSenderAndDeposit(ctx context.Context, db *database.Database, senderAddr, depositAddr string) (sender, deposit *database.Account, err error) {
-	accounts, innerErr := db.GetAccounts(ctx, senderAddr, depositAddr)
+func findRelations(ctx context.Context, db *database.Database, sender, deposit *database.Account) error {
+	switch true {
+	case sender.Cluster != nil && deposit.Cluster == nil:
+		return includeDepositToCluster(ctx, db, sender, deposit)
+	case sender.Cluster == nil && deposit.Cluster != nil:
+		return includeSenderToCluster(ctx, db, sender, deposit)
+	case sender.Cluster != nil && deposit.Cluster != nil && atomic.LoadUint64(sender.Cluster) != atomic.LoadUint64(deposit.Cluster):
+		return db.MergeClusters(ctx, *deposit.Cluster, *sender.Cluster)
+	case sender.Cluster != nil && deposit.Cluster != nil && atomic.LoadUint64(sender.Cluster) == atomic.LoadUint64(deposit.Cluster):
+		return nil
+	case sender.Cluster == nil && deposit.Cluster == nil:
+		senders, innerErr := db.GetDepositSenders(ctx, deposit.Address, sender.Address)
+		if innerErr != nil {
+			return innerErr
+		}
+
+		if len(senders) == 0 {
+			return nil
+		}
+
+		return createCluster(ctx, db, sender, deposit, senders)
+	default:
+		logging.Debugf(ctx, "Unexpected way to find relations: sender %+v, deposit %+v", sender, deposit)
+
+		return nil
+	}
+}
+
+func createCluster(ctx context.Context, db *database.Database, sender, deposit *database.Account, senders []string) error {
+	deposits, innerErr := db.GetDepositsByAddresses(ctx, senders, deposit.Address)
+	if innerErr != nil {
+		return innerErr
+	}
+
+	id, innerErr := db.CreateCluster(ctx)
+	if innerErr != nil {
+		return innerErr
+	}
+
+	accountsToUpdate := append([]string{
+		sender.Address,
+		deposit.Address,
+	}, deposits...)
+
+	return db.UpdateClusterByAddress(ctx, uint64(id), append(accountsToUpdate, senders...)...)
+}
+
+func includeDepositToCluster(ctx context.Context, db *database.Database, sender, deposit *database.Account) error {
+	senders, innerErr := db.GetDepositSenders(ctx, deposit.Address, sender.Address)
+	if innerErr != nil {
+		return innerErr
+	}
+
+	return db.UpdateClusterByAddress(ctx, *sender.Cluster, append(senders, deposit.Address)...)
+}
+
+func includeSenderToCluster(ctx context.Context, db *database.Database, sender, deposit *database.Account) error {
+	deposits, innerErr := db.GetDepositsByAddresses(ctx, []string{sender.Address}, deposit.Address)
+	if innerErr != nil {
+		return innerErr
+	}
+
+	return db.UpdateClusterByAddress(ctx, *deposit.Cluster, append(deposits, sender.Address)...)
+}
+
+func getSenderAndDeposit(ctx context.Context, db *database.Database, transfer *database.ExchangeTransfer) (sender, deposit *database.Account, err error) {
+	txToDeposit, _, innerErr := db.GetTransferTxs(ctx, transfer)
+	if innerErr != nil {
+		return nil, nil, innerErr
+	}
+
+	accounts, innerErr := db.GetAccounts(ctx, txToDeposit.FromAddress, txToDeposit.ToAddress)
 	if innerErr != nil {
 		return nil, nil, err
 	}
 
 	if len(accounts) != 2 {
-		return nil, nil, fmt.Errorf("%w: sender address %s, deposit address %s", errAccounts, senderAddr, depositAddr)
+		return nil, nil, fmt.Errorf("%w: sender address %s, deposit address %s", errAccounts, txToDeposit.FromAddress, txToDeposit.ToAddress)
 	}
+
 	for _, acc := range accounts {
 		switch acc.Address {
-		case senderAddr:
+		case txToDeposit.FromAddress:
 			sender = acc
-		case depositAddr:
+		case txToDeposit.ToAddress:
 			deposit = acc
 		}
 	}
@@ -132,46 +145,3 @@ func getExchangeTransfers(ctx context.Context, txs database.Transactions) (excha
 
 	return
 }
-
-//func AddTransfer(cluster *clustering.Cluster, transfer *transfer.ExchangeTransfer) {
-//	for _, ts := range cluster.AccountsExchangeTransfers[transfer.TxToDeposit.FromAddress] {
-//		if ts.TxToDeposit.Hash == transfer.TxToDeposit.Hash {
-//			return
-//		}
-//	}
-//
-//	cluster.Accounts[transfer.TxToDeposit.FromAddress] = struct{}{}
-//
-//	cluster.AccountsExchangeTransfers[transfer.TxToDeposit.FromAddress] = append(cluster.AccountsExchangeTransfers[transfer.TxToDeposit.FromAddress], transfer)
-//}
-//
-//func AddTransfers(cluster *clustering.Cluster, transfers []*transfer.ExchangeTransfer) {
-//	for _, t := range transfers {
-//		AddTransfer(cluster, t)
-//	}
-//}
-//
-//func HasAnAccounts(cluster *clustering.Cluster, accs map[string][]*transfer.ExchangeTransfer) bool {
-//	for acc := range accs {
-//		if _, ok := cluster.AccountsExchangeTransfers[acc]; ok {
-//			return true
-//		}
-//	}
-//
-//	return false
-//}
-//
-//// MergeMatchesExchangeTransfersAccounts Добавляет в кластер А транзакции кластера Б, если хотя бы одна транзакция к Exchange от одного аккаунта кластера Б существуют в кластере А
-//func MergeMatchesExchangeTransfersAccounts(cluster *clustering.Cluster, currentDeposit string, depositsWithSenders map[string]*clustering.Cluster) { // todo rewrite this
-//	for deposit, c := range depositsWithSenders {
-//		if !HasAnAccounts(cluster, c.AccountsExchangeTransfers) || currentDeposit == deposit {
-//			continue
-//		}
-//
-//		for _, transfers := range c.AccountsExchangeTransfers {
-//			AddTransfers(cluster, transfers)
-//		}
-//
-//		delete(depositsWithSenders, deposit)
-//	}
-//}

@@ -42,7 +42,6 @@ func (db *Database) AddBlock(ctx context.Context, block *Block) error {
 	return db.AddAccount(ctx, &Account{
 		Address: block.Miner,
 		AccType: miner,
-		Cluster: 0,
 	})
 }
 

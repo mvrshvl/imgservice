@@ -37,11 +37,6 @@ func main() {
 		log.Fatal(err)
 	}
 
-	err = exchange.SaveExchanges(exchanges)
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	//log.Println("Start airdrop...")
 	//
 	//for i := 0; i < countAirdropTokens; i++ {
@@ -339,6 +334,11 @@ func createEntitiesWithEther(ctx context.Context) ([]*user.User, []*exchange.Exc
 	users := createUsers()
 
 	exchanges, err := createExchanges(ctx, countExchanges)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	err = exchange.SaveExchanges(exchanges)
 	if err != nil {
 		return nil, nil, err
 	}

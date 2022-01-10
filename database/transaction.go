@@ -164,10 +164,13 @@ func (db *Database) GetExchangeTransfer(ctx context.Context, txsToExchange Trans
 					FROM transactions
     				LEFT JOIN exchangeTransfers
     				ON transactions.hash = exchangeTransfers.txDeposit
+					LEFT JOIN accounts
+					ON transactions.fromAddress = accounts.address
 					WHERE transactions.toAddress = ?
 					  AND transactions.blockNumber BETWEEN ? AND ?
 					  AND transactions.value BETWEEN ? AND ?
 					  AND exchangeTransfers.txDeposit IS NULL
+					  AND NOT accounts.accountType = 'exchange'
 					  LIMIT 1`
 
 		var (

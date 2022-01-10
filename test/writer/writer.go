@@ -107,7 +107,7 @@ func (w Writer) WaitTx(ctx context.Context, hash common.Hash) error {
 			case <-ctx.Done():
 				return fmt.Errorf("timeout")
 			default:
-				receipt, err := client.TransactionReceipt(ctx, hash)
+				_, err := client.TransactionReceipt(ctx, hash)
 				if err != nil {
 					if errors.Is(err, ethereum.NotFound) {
 						continue
@@ -116,7 +116,7 @@ func (w Writer) WaitTx(ctx context.Context, hash common.Hash) error {
 					return err
 				}
 
-				fmt.Println("tx", hash.String(), "gas used", receipt.GasUsed)
+				//fmt.Println("tx", hash.String(), "gas used", receipt.GasUsed)
 				return nil
 			}
 		}
