@@ -3,8 +3,8 @@ package airdrop
 import (
 	"nir/amlerror"
 	"nir/clustering"
-	"nir/clustering/blockchain"
 	"nir/clustering/transfer"
+	"nir/database"
 )
 
 const (
@@ -13,7 +13,7 @@ const (
 	minAirdropAccounts  = 5
 )
 
-func Find(tokenTransfers blockchain.TokenTransfers) (clusters clustering.Clusters, err error) {
+func Find(tokenTransfers database.TokenTransfers) (clusters clustering.Clusters, err error) {
 	owners := GetOwners(tokenTransfers)
 
 	for contract, owner := range owners {
