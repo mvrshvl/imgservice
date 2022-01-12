@@ -41,7 +41,7 @@ func (ent *User) SendTransaction(ctx context.Context, exchange string, amount in
 	acc := ent.accounts[rand.Intn(len(ent.accounts))]
 	deposit := ent.deposits[exchange][rand.Intn(len(ent.deposits[exchange]))]
 
-	fmt.Println("TRANSFER", acc.GetAddress().String(), deposit.String())
+	//fmt.Println("TRANSFER", acc.GetAddress().String(), deposit.String())
 	return acc.SendTransaction(ctx, deposit, amount, false)
 }
 
@@ -217,8 +217,6 @@ func (ent *User) DeployContract(ctx context.Context, tokens int) (*contract.Simp
 	}
 
 	for _, acc := range ent.accounts {
-		fmt.Println("APPROVE")
-
 		if distributor.GetAddress().String() == acc.GetAddress().String() {
 			continue
 		}

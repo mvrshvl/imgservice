@@ -37,14 +37,14 @@ func main() {
 		log.Fatal(err)
 	}
 
-	//log.Println("Start airdrop...")
-	//
-	//for i := 0; i < countAirdropTokens; i++ {
-	//	err = airdrop(ctx, users)
-	//	if err != nil {
-	//		log.Fatal(err)
-	//	}
-	//}
+	log.Println("Start airdrop...")
+
+	for i := 0; i < countAirdropTokens; i++ {
+		err = airdrop(ctx, users)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
 	//
 	//log.Println("Start self-auth...")
 	//
@@ -268,6 +268,8 @@ func airdrop(ctx context.Context, users []*user.User) error {
 }
 
 func transferTokensToUsers(ctx context.Context, users []*user.User, tokenContract *contract.SimpleToken, distributor *account.Account, tokens *big.Int) error {
+	fmt.Println("Distributor:", distributor.GetAddress().String())
+
 	for i := 0; i < len(users); i += 4 {
 		randIdx := i + rand.Intn(4)
 		if randIdx > len(users)-1 {

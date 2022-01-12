@@ -20,15 +20,15 @@ type Transaction struct {
 	Hash             string  `csv:"hash" db:"hash"`
 	Nonce            uint64  `csv:"nonce" db:"nonce"`
 	BlockNumber      uint64  `csv:"block_number" db:"blocknumber"`
-	TransactionIndex uint64  `csv:"transaction_index" db:"transactionindex"`
+	TransactionIndex *uint64 `csv:"transaction_index" db:"transactionindex"`
 	FromAddress      string  `csv:"from_address" db:"fromaddress"`
 	ToAddress        string  `csv:"to_address" db:"toaddress"`
-	Value            float64 `csv:"value" db:"value"`
+	Value            int64   `csv:"value" db:"value"`
 	Gas              uint64  `csv:"gas" db:"gas"`
 	GasPrice         uint64  `csv:"gas_price" db:"gasprice"`
 	Input            string  `csv:"input" db:"input"`
-	ContractAddress  string  `db:"contractaddress"`
-	Type             TxType  `db:"type"`
+	ContractAddress  *string `db:"contractaddress"`
+	Type             *TxType `db:"type"`
 }
 
 type Transactions []*Transaction
@@ -68,10 +68,10 @@ func (db *Database) AddTransactions(ctx context.Context, txs Transactions) error
 	return nil
 }
 
-func (db *Database) UpdateTxType(ctx context.Context, hash, contractAddr string, t TxType) error {
+func (db *Database) UpdateTxType(ctx context.Context, hash, contractAddr string, value int64, t TxType) error {
 	_, err := db.connection.ExecContext(ctx,
-		`UPDATE transactions SET contractAddress = ?, type = ? WHERE hash = ?`,
-		contractAddr, t, hash)
+		`UPDATE transactions SET contractAddress = ?, type = ?, value = ? WHERE hash = ?`,
+		contractAddr, t, value, hash)
 
 	if err != nil {
 		return fmt.Errorf("can't update tx: %w", err)
@@ -82,7 +82,7 @@ func (db *Database) UpdateTxType(ctx context.Context, hash, contractAddr string,
 
 func (db *Database) UpdateTokenTransfers(ctx context.Context, txs TokenTransfers) error {
 	for _, tx := range txs {
-		err := db.UpdateTxType(ctx, tx.TxHash, tx.ContractAddress, TxTransfer)
+		err := db.UpdateTxType(ctx, tx.TxHash, tx.ContractAddress, tx.Value, TxTransfer)
 		if err != nil {
 			return err
 		}
@@ -93,7 +93,7 @@ func (db *Database) UpdateTokenTransfers(ctx context.Context, txs TokenTransfers
 
 func (db *Database) UpdateApproves(ctx context.Context, txs ERC20Approves) error {
 	for _, tx := range txs {
-		err := db.UpdateTxType(ctx, tx.TxHash, tx.ContractAddress, TxApprove)
+		err := db.UpdateTxType(ctx, tx.TxHash, tx.ContractAddress, 0, TxApprove)
 		if err != nil {
 			return err
 		}
@@ -113,8 +113,7 @@ func (db *Database) GetTxsToExchange(ctx context.Context, txs Transactions) (Tra
 		return nil, nil
 	}
 
-	query := `SELECT hash, nonce, blocknumber, fromaddress, toaddress, value, gas, gasprice, input
-					FROM transactions
+	query := `SELECT * FROM transactions
     				LEFT JOIN exchanges
     				ON transactions.toAddress = exchanges.Address
 					WHERE hash IN ( ? )
@@ -159,9 +158,7 @@ func (db *Database) GetExchangeTransfer(ctx context.Context, txsToExchange Trans
 	transfers := make([]*ExchangeTransfer, 0, len(txsToExchange))
 
 	for _, txToExchange := range txsToExchange {
-		query := `SELECT hash, nonce, blocknumber, fromaddress, toaddress, 
-       					value, gas, gasprice, input
-					FROM transactions
+		query := `SELECT * FROM transactions
     				LEFT JOIN exchangeTransfers
     				ON transactions.hash = exchangeTransfers.txDeposit
 					LEFT JOIN accounts
@@ -187,8 +184,8 @@ func (db *Database) GetExchangeTransfer(ctx context.Context, txsToExchange Trans
 			maxBlock = txToExchange.BlockNumber - 1
 		}
 
-		if txToExchange.Value > float64(txToExchange.Gas*txToExchange.GasPrice)*diffGasKoef {
-			minValue = txToExchange.Value - float64(txToExchange.Gas*txToExchange.GasPrice)*diffGasKoef
+		if float64(txToExchange.Value) > float64(txToExchange.Gas*txToExchange.GasPrice)*diffGasKoef {
+			minValue = float64(txToExchange.Value) - float64(txToExchange.Gas*txToExchange.GasPrice)*diffGasKoef
 		}
 		rows, err := db.connection.QueryContext(ctx, query, txToExchange.FromAddress,
 			minBlock, maxBlock,
@@ -232,12 +229,15 @@ func scanTransactions(rows *sql.Rows) (txs Transactions, err error) {
 			&tx.Hash,
 			&tx.Nonce,
 			&tx.BlockNumber,
+			&tx.TransactionIndex,
 			&tx.FromAddress,
 			&tx.ToAddress,
 			&tx.Value,
 			&tx.Gas,
 			&tx.GasPrice,
 			&tx.Input,
+			&tx.ContractAddress,
+			&tx.Type,
 		)
 
 		if err != nil {
