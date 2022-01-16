@@ -35,7 +35,7 @@ type Transactions []*Transaction
 
 func (db *Database) AddTransaction(ctx context.Context, tx *Transaction) error {
 	_, err := db.connection.ExecContext(ctx,
-		`INSERT INTO transactions(hash, nonce, blockNumber, transactionIndex, fromAddress, toAddress, value, gas, gasPrice, input)
+		`INSERT INTO transactions(hash, nonce, blockNumber, transactionIndex, FromAddress, toAddress, value, gas, gasPrice, input)
     			VALUES(?,?,?,?,?,?,?,?,?,?)`,
 		tx.Hash, tx.Nonce, tx.BlockNumber, tx.TransactionIndex, tx.FromAddress, tx.ToAddress, tx.Value, tx.Gas, tx.GasPrice, tx.Input)
 
@@ -70,7 +70,7 @@ func (db *Database) AddTransactions(ctx context.Context, txs Transactions) error
 
 func (db *Database) UpdateTxType(ctx context.Context, hash, contractAddr string, value int64, t TxType) error {
 	_, err := db.connection.ExecContext(ctx,
-		`UPDATE transactions SET contractAddress = ?, type = ?, value = ? WHERE hash = ?`,
+		`UPDATE transactions SET ContractAddress = ?, type = ?, value = ? WHERE hash = ?`,
 		contractAddr, t, value, hash)
 
 	if err != nil {
@@ -162,7 +162,7 @@ func (db *Database) GetExchangeTransfer(ctx context.Context, txsToExchange Trans
     				LEFT JOIN exchangeTransfers
     				ON transactions.hash = exchangeTransfers.txDeposit
 					LEFT JOIN accounts
-					ON transactions.fromAddress = accounts.address
+					ON transactions.FromAddress = accounts.address
 					WHERE transactions.toAddress = ?
 					  AND transactions.blockNumber BETWEEN ? AND ?
 					  AND transactions.value BETWEEN ? AND ?

@@ -1,74 +1,24 @@
 package airdrop
 
 import (
-	"nir/amlerror"
-	"nir/clustering"
-	"nir/clustering/transfer"
+	"context"
 	"nir/database"
+	"nir/di"
 )
 
 const (
-	address0            = "0x0000000000000000000000000000000000000000"
-	errRecursiveCounter = amlerror.AMLError("Recursion exceeded the allowed rate")
-	minAirdropAccounts  = 5
+	minAirdropAccounts = uint64(5)
+	blockDiff          = uint64(1000)
 )
 
-func Find(tokenTransfers database.TokenTransfers) (clusters clustering.Clusters, err error) {
-	owners := GetOwners(tokenTransfers)
-
-	for contract, owner := range owners {
-		ownerTransfers := GetTargetTransactions(tokenTransfers, contract, owner)
-
-		if len(ownerTransfers) < minAirdropAccounts {
-			continue
-		}
-
-		remainingAccountsTransfers := getAirdropAccountsWithTransfers(tokenTransfers, ownerTransfers)
-
-		for target, sources := range remainingAccountsTransfers {
-			cluster := clustering.NewCluster()
-
-			AddTransfersToCluster(cluster, sources)
-
-			err = merge(remainingAccountsTransfers, 0, target, sources, cluster)
-			if err != nil {
-				return nil, err
-			}
-
-			if len(cluster.AccountsTokenTransfers) >= 2 {
-				clusters = append(clusters, cluster)
-			}
-
-		}
-
-		for _, ts := range remainingAccountsTransfers {
-			cluster := clustering.NewCluster()
-			AddTransfersToCluster(cluster, ts)
-
-			clusters = append(clusters, cluster)
-		}
+func Run(ctx context.Context, toBlock uint64) error {
+	airdrops, err := getAirdrops(ctx, getFromBlock(toBlock, blockDiff), toBlock, minAirdropAccounts)
+	if err != nil {
+		return err
 	}
 
-	return
-}
-
-func merge(accountsTransfers map[string]map[string]*blockchain.TokenTransfer, counter uint64, target string, sources map[string]*blockchain.TokenTransfer, cluster *clustering.Cluster) error {
-	if counter == 100000 {
-		return errRecursiveCounter
-	}
-
-	for source := range sources {
-		copySources, ok := accountsTransfers[source]
-		if !ok {
-			continue
-		}
-
-		AddTransfersToCluster(cluster, copySources)
-
-		delete(accountsTransfers, target)
-		delete(accountsTransfers, source)
-
-		err := merge(accountsTransfers, counter+1, source, copySources, cluster)
+	for _, airdrop := range airdrops {
+		err = clustering(ctx, airdrop)
 		if err != nil {
 			return err
 		}
@@ -77,80 +27,82 @@ func merge(accountsTransfers map[string]map[string]*blockchain.TokenTransfer, co
 	return nil
 }
 
-func AddTransferToClusterAccount(cluster *clustering.Cluster, account string, t *blockchain.TokenTransfer) {
-	cluster.Accounts[account] = struct{}{}
+func clustering(ctx context.Context, airdrop *database.Airdrop) error {
+	return di.FromContext(ctx).Invoke(func(db *database.Database) error {
+		txs, err := db.FindTransfersBetweenMembers(ctx, airdrop)
+		if err != nil {
+			return err
+		}
 
-	cluster.AccountsTokenTransfers[account] = append(cluster.AccountsTokenTransfers[account], &transfer.TokenTransfer{
-		TokenAddress: t.ContractAddress,
-		FromAddress:  t.SourceAddress,
-		ToAddress:    t.TargetAddress,
-		Value:        t.Value,
+		if len(txs) == 0 {
+			return nil
+		}
+
+		for _, tx := range txs {
+			sender, receiver, err := db.GetSenderAndReceiver(ctx, tx.FromAddress, tx.ToAddress)
+			if err != nil {
+				return err
+			}
+
+			err = db.UpdateCluster(ctx, sender, receiver, clusteringBySender, clusteringByReceiver, createCluster)
+			if err != nil {
+				return err
+			}
+		}
+
+		return nil
 	})
 }
 
-func AddTransfersToCluster(cluster *clustering.Cluster, ts map[string]*blockchain.TokenTransfer) {
-	for _, t := range ts {
-		AddTransferToClusterAccount(cluster, t.TargetAddress, t)
+func includeAccountToCluster(ctx context.Context, db *database.Database, toInclude *database.Account, byInclude *database.Account) error {
+	deposits, innerErr := db.GetDepositsByAddresses(ctx, []string{toInclude.Address})
+	if innerErr != nil {
+		return innerErr
 	}
+
+	return db.UpdateClusterByAddress(ctx, *byInclude.Cluster, append(deposits, toInclude.Address)...)
 }
 
-func GetOwners(tokenTransfers blockchain.TokenTransfers) (owners map[string]string) {
-	owners = make(map[string]string)
-
-	for _, tokenTransfer := range tokenTransfers {
-		if tokenTransfer.SourceAddress == address0 {
-			owners[tokenTransfer.ContractAddress] = tokenTransfer.TargetAddress
-		}
-	}
-
-	return owners
+func clusteringBySender(ctx context.Context, db *database.Database, from, to *database.Account) error {
+	return includeAccountToCluster(ctx, db, to, from)
 }
 
-func GetTargetTransactions(tokenTransfers blockchain.TokenTransfers, contract, distributor string) map[string]*blockchain.TokenTransfer {
-	addresses := make(map[string]*blockchain.TokenTransfer)
-
-	for _, tokenTransfer := range tokenTransfers {
-		if tokenTransfer.SourceAddress == distributor && tokenTransfer.ContractAddress == contract {
-			addresses[tokenTransfer.TargetAddress] = tokenTransfer
-		}
-	}
-
-	// filter by value
-	// filter by date
-	return addresses
+func clusteringByReceiver(ctx context.Context, db *database.Database, from, to *database.Account) error {
+	return includeAccountToCluster(ctx, db, from, to)
 }
 
-func getAirdropAccountsWithTransfers(tokenTransfers blockchain.TokenTransfers, airdropAccounts map[string]*blockchain.TokenTransfer) map[string]map[string]*blockchain.TokenTransfer {
-	accountsTransfers := make(map[string]map[string]*blockchain.TokenTransfer)
-
-	for acc := range airdropAccounts {
-		accountsTransfers[acc] = map[string]*blockchain.TokenTransfer{airdropAccounts[acc].SourceAddress: airdropAccounts[acc]} //add t from distributor
+func createCluster(ctx context.Context, db *database.Database, sender, receiver *database.Account) error {
+	id, err := db.CreateCluster(ctx)
+	if err != nil {
+		return err
 	}
 
-	for acc, t := range airdropAccounts {
-		targetsTransfers := GetTargetTransactions(tokenTransfers, t.ContractAddress, acc)
-		for target, tr := range targetsTransfers {
-			if _, ok := accountsTransfers[target]; !ok {
-				accountsTransfers[target] = make(map[string]*blockchain.TokenTransfer)
-			}
-
-			accountsTransfers[target][acc] = tr
-		}
+	byInclude := &database.Account{
+		Cluster: &id,
 	}
 
-	return accountsTransfers
+	err = includeAccountToCluster(ctx, db, sender, byInclude)
+	if err != nil {
+		return err
+	}
+
+	return includeAccountToCluster(ctx, db, receiver, byInclude)
 }
 
-func GetAirdropDistributors(tokenTransfers blockchain.TokenTransfers) (distributors []string) {
-	owners := GetOwners(tokenTransfers)
+func getAirdrops(ctx context.Context, fromBlock, toBlock, minSize uint64) (airdrops []*database.Airdrop, err error) {
+	err = di.FromContext(ctx).Invoke(func(db *database.Database) (innerErr error) {
+		airdrops, innerErr = db.GetAirdrops(ctx, fromBlock, toBlock, minSize)
 
-	for contract, owner := range owners {
-		ownerTransfers := GetTargetTransactions(tokenTransfers, contract, owner)
-
-		if len(ownerTransfers) > minAirdropAccounts {
-			distributors = append(distributors, owner)
-		}
-	}
+		return innerErr
+	})
 
 	return
+}
+
+func getFromBlock(toBlock, diffBlock uint64) uint64 {
+	if toBlock > diffBlock {
+		return diffBlock - toBlock
+	}
+
+	return 0
 }

@@ -26,7 +26,7 @@ func (db *Database) AddExchangeTransfer(ctx context.Context, txExchangeHash, txD
 }
 
 func (db *Database) GetTransferTxs(ctx context.Context, transfer *ExchangeTransfer) (txToDeposit, txToExchange *Transaction, err error) {
-	query := `SELECT hash, nonce, blockNumber, fromAddress, toAddress, value, gas, gasPrice, input FROM transactions
+	query := `SELECT hash, nonce, blockNumber, FromAddress, toAddress, value, gas, gasPrice, input FROM transactions
 				WHERE hash = ?
  				   OR hash = ?`
 

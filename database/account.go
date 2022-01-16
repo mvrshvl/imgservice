@@ -5,16 +5,19 @@ import (
 	"database/sql"
 	"fmt"
 	"github.com/jmoiron/sqlx"
+	"nir/amlerror"
 	logging "nir/log"
+	"sync/atomic"
 )
 
 type AccountType string
 
 const (
-	eoa      AccountType = "eoa"
-	miner    AccountType = "miner"
-	deposit  AccountType = "deposit"
-	exchange AccountType = "exchange"
+	eoa         AccountType = "eoa"
+	miner       AccountType = "miner"
+	deposit     AccountType = "deposit"
+	exchange    AccountType = "exchange"
+	errAccounts             = amlerror.AMLError("can't get transfer accounts")
 )
 
 type Account struct {
@@ -87,9 +90,9 @@ func scanAccounts(rows *sql.Rows) ([]*Account, error) {
 }
 
 func (db *Database) GetDepositSenders(ctx context.Context, address string, excludeAddresses ...string) ([]string, error) {
-	query := `SELECT DISTINCT fromAddress FROM transactions
+	query := `SELECT DISTINCT FromAddress FROM transactions
 				LEFT JOIN accounts
-				ON transactions.fromAddress = accounts.address
+				ON transactions.FromAddress = accounts.address
 				WHERE toAddress = ?
 				  AND NOT accountType = 'exchange'`
 
@@ -101,7 +104,7 @@ func (db *Database) GetDepositsByAddresses(ctx context.Context, addresses []stri
 				LEFT JOIN accounts
 				ON transactions.toAddress = accounts.address
 				WHERE accounts.accountType = ?
-				AND transactions.fromAddress IN ( ? )`
+				AND transactions.FromAddress IN ( ? )`
 
 	queryIn, args, err := sqlx.In(query, deposit, addresses)
 	if err != nil {
@@ -180,7 +183,7 @@ func (db *Database) UpdateClusterByCluster(ctx context.Context, src, dst uint64)
 	return nil
 }
 
-func (db *Database) CreateCluster(ctx context.Context) (int64, error) {
+func (db *Database) CreateCluster(ctx context.Context) (uint64, error) {
 	query := `INSERT INTO clusters() VALUES ()`
 
 	res, err := db.connection.ExecContext(ctx, query)
@@ -193,7 +196,7 @@ func (db *Database) CreateCluster(ctx context.Context) (int64, error) {
 		return 0, err
 	}
 
-	return id, nil
+	return uint64(id), nil
 }
 
 func (db *Database) DeleteCluster(ctx context.Context, id uint64) error {
@@ -216,4 +219,45 @@ func (db *Database) MergeClusters(ctx context.Context, src, dst uint64) error {
 	}
 
 	return db.DeleteCluster(ctx, src)
+}
+
+func (db *Database) GetSenderAndReceiver(ctx context.Context, fromAddress, toAddress string) (sender, receiver *Account, err error) {
+	accounts, innerErr := db.GetAccounts(ctx, fromAddress, toAddress)
+	if innerErr != nil {
+		return nil, nil, err
+	}
+
+	if len(accounts) != 2 {
+		return nil, nil, fmt.Errorf("%w: sender address %s, deposit address %s", errAccounts, fromAddress, toAddress)
+	}
+
+	for _, acc := range accounts {
+		switch acc.Address {
+		case fromAddress:
+			sender = acc
+		case toAddress:
+			receiver = acc
+		}
+	}
+
+	return sender, receiver, nil
+}
+
+func (db *Database) UpdateCluster(ctx context.Context, sender, receiver *Account, clusteringBySender, clusteringByReceiver, createCluster func(ctx context.Context, db *Database, from, to *Account) error) error {
+	switch true {
+	case sender.Cluster != nil && receiver.Cluster != nil && atomic.LoadUint64(sender.Cluster) != atomic.LoadUint64(receiver.Cluster):
+		return db.MergeClusters(ctx, *receiver.Cluster, *sender.Cluster)
+	case sender.Cluster != nil && receiver.Cluster != nil && atomic.LoadUint64(sender.Cluster) == atomic.LoadUint64(receiver.Cluster):
+		return nil
+	case sender.Cluster != nil && receiver.Cluster == nil:
+		return clusteringBySender(ctx, db, sender, receiver)
+	case sender.Cluster == nil && receiver.Cluster != nil:
+		return clusteringByReceiver(ctx, db, sender, receiver)
+	case sender.Cluster == nil && receiver.Cluster == nil:
+		return createCluster(ctx, db, sender, receiver)
+	default:
+		logging.Debugf(ctx, "Unexpected way to find relations: sender %+v, deposit %+v", sender, receiver)
+
+		return nil
+	}
 }
