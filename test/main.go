@@ -270,13 +270,13 @@ func airdrop(ctx context.Context, users []*user.User) error {
 func transferTokensToUsers(ctx context.Context, users []*user.User, tokenContract *contract.SimpleToken, distributor *account.Account, tokens *big.Int) error {
 	fmt.Println("Distributor:", distributor.GetAddress().String())
 
-	for i := 0; i < len(users); i += 4 {
-		randIdx := i + rand.Intn(4)
-		if randIdx > len(users)-1 {
-			return nil
-		}
+	for i := 0; i < len(users); i++ {
+		//randIdx := i + rand.Intn(4)
+		//if randIdx > len(users)-1 {
+		//	return nil
+		//}
 
-		for _, acc := range users[randIdx].GetAccounts() {
+		for _, acc := range users[i].GetAccounts() {
 			err := transferToken(ctx, tokenContract, distributor, acc, tokens)
 			if err != nil {
 				return err

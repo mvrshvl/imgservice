@@ -2,6 +2,7 @@ package depositreuse
 
 import (
 	"context"
+	"fmt"
 	"nir/amlerror"
 	"nir/database"
 	"nir/di"
@@ -29,10 +30,15 @@ func clustering(ctx context.Context, transfer *database.ExchangeTransfer) error 
 	return di.FromContext(ctx).Invoke(func(db *database.Database) error {
 		sender, deposit, innerErr := getSenderAndDeposit(ctx, db, transfer)
 		if innerErr != nil {
-			return innerErr
+			return fmt.Errorf("can't get sender and deposit accounts %v: %w", transfer, innerErr)
 		}
 
-		return db.UpdateCluster(ctx, sender, deposit, includeDepositToCluster, includeSenderToCluster, createCluster)
+		innerErr = db.UpdateCluster(ctx, sender, deposit, includeDepositToCluster, includeSenderToCluster, createCluster)
+		if innerErr != nil {
+			return fmt.Errorf("can't update cluster: %w", innerErr)
+		}
+
+		return nil
 	})
 }
 
@@ -117,12 +123,15 @@ func getExchangeTransfers(ctx context.Context, txs database.Transactions) (excha
 	err = di.FromContext(ctx).Invoke(func(db *database.Database) error {
 		txsToExchange, innerErr := db.GetTxsToExchange(ctx, txs)
 		if innerErr != nil {
-			return innerErr
+			return fmt.Errorf("can't get txs to exchange: %w", innerErr)
 		}
 
 		exchangeTransfers, innerErr = db.GetExchangeTransfer(ctx, txsToExchange, 10000, 1.5)
+		if innerErr != nil {
+			return fmt.Errorf("can't get exchange transfers: %w", innerErr)
+		}
 
-		return innerErr
+		return nil
 	})
 
 	return

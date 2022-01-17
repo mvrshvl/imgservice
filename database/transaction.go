@@ -12,6 +12,7 @@ import (
 type TxType string
 
 const (
+	address0          = "0x0000000000000000000000000000000000000000"
 	TxApprove  TxType = "approve"
 	TxTransfer TxType = "transfer"
 )
@@ -19,15 +20,15 @@ const (
 type Transaction struct {
 	Hash             string  `csv:"hash" db:"hash"`
 	Nonce            uint64  `csv:"nonce" db:"nonce"`
-	BlockNumber      uint64  `csv:"block_number" db:"blocknumber"`
-	TransactionIndex *uint64 `csv:"transaction_index" db:"transactionindex"`
-	FromAddress      string  `csv:"from_address" db:"fromaddress"`
-	ToAddress        string  `csv:"to_address" db:"toaddress"`
+	BlockNumber      uint64  `csv:"block_number" db:"blockNumber"`
+	TransactionIndex *uint64 `csv:"transaction_index" db:"transactionIndex"`
+	FromAddress      string  `csv:"from_address" db:"fromAddress"`
+	ToAddress        string  `csv:"to_address" db:"toAddress"`
 	Value            int64   `csv:"value" db:"value"`
 	Gas              uint64  `csv:"gas" db:"gas"`
-	GasPrice         uint64  `csv:"gas_price" db:"gasprice"`
+	GasPrice         uint64  `csv:"gas_price" db:"gasPrice"`
 	Input            string  `csv:"input" db:"input"`
-	ContractAddress  *string `db:"contractaddress"`
+	ContractAddress  *string `db:"contractAddress"`
 	Type             *TxType `db:"type"`
 }
 
@@ -68,9 +69,21 @@ func (db *Database) AddTransactions(ctx context.Context, txs Transactions) error
 	return nil
 }
 
-func (db *Database) UpdateTxType(ctx context.Context, hash, contractAddr string, value int64, t TxType) error {
+func (db *Database) UpdateTxType(ctx context.Context, hash, toAddress, contractAddr string, value int64, t TxType) error {
 	_, err := db.connection.ExecContext(ctx,
-		`UPDATE transactions SET ContractAddress = ?, type = ?, value = ? WHERE hash = ?`,
+		`UPDATE transactions SET toAddress = ?, contractAddress = ?, type = ?, value = ? WHERE hash = ?`,
+		toAddress, contractAddr, t, value, hash)
+
+	if err != nil {
+		return fmt.Errorf("can't update tx: %w", err)
+	}
+
+	return nil
+}
+
+func (db *Database) UpdateTxDeploy(ctx context.Context, hash, contractAddr string, value int64, t TxType) error {
+	_, err := db.connection.ExecContext(ctx,
+		`UPDATE transactions SET contractAddress = ?, type = ?, value = ? WHERE hash = ?`,
 		contractAddr, t, value, hash)
 
 	if err != nil {
@@ -82,7 +95,16 @@ func (db *Database) UpdateTxType(ctx context.Context, hash, contractAddr string,
 
 func (db *Database) UpdateTokenTransfers(ctx context.Context, txs TokenTransfers) error {
 	for _, tx := range txs {
-		err := db.UpdateTxType(ctx, tx.TxHash, tx.ContractAddress, tx.Value, TxTransfer)
+		if tx.SourceAddress == address0 {
+			err := db.UpdateTxDeploy(ctx, tx.TxHash, tx.ContractAddress, tx.Value, TxTransfer)
+			if err != nil {
+				return err
+			}
+
+			continue
+		}
+
+		err := db.UpdateTxType(ctx, tx.TxHash, tx.TargetAddress, tx.ContractAddress, tx.Value, TxTransfer)
 		if err != nil {
 			return err
 		}
@@ -93,7 +115,7 @@ func (db *Database) UpdateTokenTransfers(ctx context.Context, txs TokenTransfers
 
 func (db *Database) UpdateApproves(ctx context.Context, txs ERC20Approves) error {
 	for _, tx := range txs {
-		err := db.UpdateTxType(ctx, tx.TxHash, tx.ContractAddress, 0, TxApprove)
+		err := db.UpdateTxType(ctx, tx.TxHash, tx.ToAddress, tx.ContractAddress, 0, TxApprove)
 		if err != nil {
 			return err
 		}
@@ -113,7 +135,7 @@ func (db *Database) GetTxsToExchange(ctx context.Context, txs Transactions) (Tra
 		return nil, nil
 	}
 
-	query := `SELECT * FROM transactions
+	query := `SELECT hash, nonce, blockNumber, transactionIndex, fromAddress, toAddress, value, gas, gasPrice, input, contractAddress, type FROM transactions
     				LEFT JOIN exchanges
     				ON transactions.toAddress = exchanges.Address
 					WHERE hash IN ( ? )
@@ -158,7 +180,7 @@ func (db *Database) GetExchangeTransfer(ctx context.Context, txsToExchange Trans
 	transfers := make([]*ExchangeTransfer, 0, len(txsToExchange))
 
 	for _, txToExchange := range txsToExchange {
-		query := `SELECT * FROM transactions
+		query := `SELECT hash, nonce, blockNumber, fromAddress, transactionIndex, toAddress, value, gas, gasPrice, input, contractAddress, type FROM transactions
     				LEFT JOIN exchangeTransfers
     				ON transactions.hash = exchangeTransfers.txDeposit
 					LEFT JOIN accounts

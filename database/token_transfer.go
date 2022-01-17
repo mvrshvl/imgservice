@@ -8,8 +8,6 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-const address0 = "0x0000000000000000000000000000000000000000"
-
 type TokenTransfer struct {
 	ContractAddress string `csv:"token_address"`
 	SourceAddress   string `csv:"from_address"`
@@ -66,9 +64,9 @@ func (db *Database) FindTransfersBetweenMembers(ctx context.Context, a *Airdrop)
 				AND toAddress IN ( ? )
 				AND contractAddress = ?`
 
-	queryIn, args, err := sqlx.In(query, receivers, receivers)
+	queryIn, args, err := sqlx.In(query, receivers, receivers, a.ContractAddress)
 	if err != nil {
-		return nil, fmt.Errorf("can't create IN QUERY: %w", err)
+		return nil, fmt.Errorf("can't create IN QUERY for transfers between members: %w", err)
 	}
 
 	rows, err := db.connection.QueryContext(ctx, queryIn, args...)
@@ -108,7 +106,7 @@ func groupByAirdrop(txs Transactions) (airdrops []*Airdrop) {
 
 // FilterOwners вернуть если addr это владелец контракта или для адреса существует approve на этот контракт
 func (db *Database) FilterOwners(ctx context.Context, airdrops []*Airdrop) (filtered []*Airdrop, err error) {
-	query := `SELECT * FROM transactions
+	query := `SELECT hash, nonce, blockNumber, transactionIndex, fromAddress, toAddress, value, gas, gasPrice, input, contractAddress, type FROM transactions
 				WHERE ContractAddress = ?
 				AND ((type = 'transfer'
             	AND toAddress = ''
@@ -118,9 +116,9 @@ func (db *Database) FilterOwners(ctx context.Context, airdrops []*Airdrop) (filt
 				LIMIT 1`
 
 	for _, airdrop := range airdrops {
-		var tx Transaction
+		tx := new(Transaction)
 
-		err = db.connection.GetContext(ctx, &tx, query, airdrop.ContractAddress, airdrop.FromAddress, airdrop.FromAddress)
+		err = db.connection.GetContext(ctx, tx, query, airdrop.ContractAddress, airdrop.FromAddress, airdrop.FromAddress)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				continue
@@ -132,5 +130,5 @@ func (db *Database) FilterOwners(ctx context.Context, airdrops []*Airdrop) (filt
 		filtered = append(filtered, airdrop)
 	}
 
-	return
+	return filtered, nil
 }
