@@ -14,6 +14,10 @@ type AddressApproves struct {
 func Find(approves blockchain.ERC20Approves) clustering.Clusters {
 	addresses := getAddresses(approves)
 
+	// Получить адреса для которых количество входящих аппрувов или исходящих аппрувов не больше 10
+	// аккаунты не должны быть биржами
+	// Аккаунты по каждому контракту собрать в кластер
+
 	for address, addressApproves := range addresses {
 		if len(addressApproves.fromApprove) > 10 || len(addressApproves.toApprove) > 10 || len(addressApproves.fromApprove) > 5 || len(addressApproves.toApprove) > 5 {
 			delete(addresses, address)
