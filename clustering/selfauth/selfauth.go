@@ -15,6 +15,24 @@ func Find(approves blockchain.ERC20Approves) clustering.Clusters {
 	addresses := getAddresses(approves)
 
 	// Получить адреса для которых количество входящих аппрувов или исходящих аппрувов не больше 10
+	/*
+		SELECT * FROM transactions
+		WHERE type = approve
+		AND blockNumber BETWEEN ? AND >
+		GROUP BY contractAddress, fromAddress
+
+		SELECT contractAddress, toAddress, COUNT(*) FROM transactions
+		WHERE type = approve
+		AND blockNumber BETWEEN ? AND >
+		GROUP BY contractAddress, toAddress
+
+		SELECT * FROM transactions
+		LEFT JOIN tab
+		ON contractAddress = tab.contractAddress AND
+		   toAddress = tab.toAddress AND
+		WHERE transactions.blockNumber BETWEEN ? AND ?
+		AND   transactions.type = approve.
+	*/
 	// аккаунты не должны быть биржами
 	// Аккаунты по каждому контракту собрать в кластер
 
