@@ -17,6 +17,7 @@ const (
 	miner       AccountType = "miner"
 	deposit     AccountType = "deposit"
 	exchange    AccountType = "exchange"
+	Scammer     AccountType = "scammer"
 	errAccounts             = amlerror.AMLError("can't get transfer accounts")
 )
 
@@ -24,13 +25,14 @@ type Account struct {
 	Address string      `db:"Address"`
 	AccType AccountType `db:"accountType"`
 	Cluster *uint64     `db:"Cluster"`
+	Comment *string     `db:"Comment"`
 }
 
-func (db *Database) AddAccount(ctx context.Context, account *Account) error {
-	_, err := db.connection.ExecContext(ctx,
-		`INSERT IGNORE INTO accounts (Address, accountType)
-				VALUES (?, ?)`,
-		account.Address, account.AccType)
+func (account Account) AddAccount(ctx context.Context, db sqlx.ExecerContext) error {
+	_, err := db.ExecContext(ctx,
+		`INSERT IGNORE INTO accounts (address, accountType, comment)
+				VALUES (?, ?, ?)`,
+		account.Address, account.AccType, account.Comment)
 	if err != nil {
 		return fmt.Errorf("can't add account: %w", err)
 	}

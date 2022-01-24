@@ -2,6 +2,7 @@ package database
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"time"
 )
@@ -10,7 +11,6 @@ type Block struct {
 	Number           uint64 `csv:"number" db:"number"`
 	Hash             string `csv:"hash" db:"hash"`
 	ParentHash       string `csv:"parent_hash" db:"parentHash"`
-	Nonce            uint64 `csv:"nonce" db:"nonce"`
 	Miner            string `csv:"miner" db:"miner"`
 	GasLimit         uint64 `csv:"gas_limit" db:"gasLimit"`
 	GasUsed          uint64 `csv:"gas_used" db:"gasUsed"`
@@ -30,28 +30,44 @@ func (db *Database) GetLastBlock(ctx context.Context) (uint64, error) {
 	return *blockNum, nil
 }
 
-func (db *Database) AddBlock(ctx context.Context, block *Block) error {
-	_, err := db.connection.ExecContext(ctx,
-		`INSERT INTO blocks(number, hash, parentHash, nonce, miner, gasLimit, gasUsed, blockTimestamp, transactionsCount)
-    			VALUES(?,?,?,?,?,?,?,?,?)`,
-		block.Number, block.Hash, block.ParentHash, block.Nonce, block.Miner, block.GasLimit, block.GasUsed, time.Unix(block.Timestamp, 0), block.TransactionCount)
+func (block *Block) AddBlock(ctx context.Context, tx *sql.Tx) error {
+	_, err := tx.ExecContext(ctx,
+		`INSERT INTO blocks(number, hash, parentHash, miner, gasLimit, gasUsed, blockTimestamp, transactionsCount)
+    			VALUES(?,?,?,?,?,?,?,?)`,
+		block.Number, block.Hash, block.ParentHash, block.Miner, block.GasLimit, block.GasUsed, time.Unix(block.Timestamp, 0), block.TransactionCount)
 	if err != nil {
 		return fmt.Errorf("can't add block: %w", err)
 	}
 
-	return db.AddAccount(ctx, &Account{
+	account := &Account{
 		Address: block.Miner,
 		AccType: miner,
-	})
+	}
+
+	return account.AddAccount(ctx, tx)
 }
 
-func (db *Database) AddBlocks(ctx context.Context, blocks Blocks) error {
+func (blocks Blocks) AddBlocks(ctx context.Context, tx *sql.Tx) error {
 	for _, b := range blocks {
-		err := db.AddBlock(ctx, b)
+		err := b.AddBlock(ctx, tx)
 		if err != nil {
 			return err
 		}
 	}
 
 	return nil
+}
+
+func (db *Database) ExecuteTx(ctx context.Context, fn func(ctx context.Context, tx *sql.Tx) error) error {
+	tx, err := db.connection.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("can't begin tx %w", err)
+	}
+
+	err = fn(ctx, tx)
+	if err != nil {
+		return fmt.Errorf("can't execute tx: %w. rollback: %v", err, tx.Rollback())
+	}
+
+	return tx.Commit()
 }
