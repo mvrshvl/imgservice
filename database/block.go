@@ -11,7 +11,7 @@ type Block struct {
 	Number           uint64 `csv:"number" db:"number"`
 	Hash             string `csv:"hash" db:"hash"`
 	ParentHash       string `csv:"parent_hash" db:"parentHash"`
-	Miner            string `csv:"miner" db:"miner"`
+	Miner            string `csv:"MinerAccount" db:"MinerAccount"`
 	GasLimit         uint64 `csv:"gas_limit" db:"gasLimit"`
 	GasUsed          uint64 `csv:"gas_used" db:"gasUsed"`
 	Timestamp        int64  `csv:"timestamp" db:"blockTimestamp"`
@@ -32,7 +32,7 @@ func (db *Database) GetLastBlock(ctx context.Context) (uint64, error) {
 
 func (block *Block) AddBlock(ctx context.Context, tx *sql.Tx) error {
 	_, err := tx.ExecContext(ctx,
-		`INSERT INTO blocks(number, hash, parentHash, miner, gasLimit, gasUsed, blockTimestamp, transactionsCount)
+		`INSERT INTO blocks(number, hash, parentHash, MinerAccount, gasLimit, gasUsed, blockTimestamp, transactionsCount)
     			VALUES(?,?,?,?,?,?,?,?)`,
 		block.Number, block.Hash, block.ParentHash, block.Miner, block.GasLimit, block.GasUsed, time.Unix(block.Timestamp, 0), block.TransactionCount)
 	if err != nil {
@@ -41,7 +41,7 @@ func (block *Block) AddBlock(ctx context.Context, tx *sql.Tx) error {
 
 	account := &Account{
 		Address: block.Miner,
-		AccType: miner,
+		AccType: MinerAccount,
 	}
 
 	return account.AddAccount(ctx, tx)

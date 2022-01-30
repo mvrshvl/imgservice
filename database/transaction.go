@@ -153,7 +153,7 @@ func (db *Database) GetTxsToExchange(ctx context.Context, txs Transactions) (Tra
 			return nil, nil
 		}
 
-		return nil, fmt.Errorf("can't get exchange transfers: %w", err)
+		return nil, fmt.Errorf("can't get ExchangeAccount transfers: %w", err)
 	}
 
 	txsToExchange, err := scanTransactions(rows)
@@ -161,14 +161,14 @@ func (db *Database) GetTxsToExchange(ctx context.Context, txs Transactions) (Tra
 		return nil, err
 	}
 
-	// update accounts set deposit and exchange type
+	// update accounts set deposit and ExchangeAccount type
 	for _, txToExchange := range txsToExchange {
 		err = db.UpdateAccountType(ctx, txToExchange.FromAddress, deposit)
 		if err != nil {
 			return nil, err
 		}
 
-		err = db.UpdateAccountType(ctx, txToExchange.ToAddress, exchange)
+		err = db.UpdateAccountType(ctx, txToExchange.ToAddress, ExchangeAccount)
 		if err != nil {
 			return nil, err
 		}
@@ -190,7 +190,7 @@ func (db *Database) GetExchangeTransfer(ctx context.Context, txsToExchange Trans
 					  AND transactions.blockNumber BETWEEN ? AND ?
 					  AND transactions.value BETWEEN ? AND ?
 					  AND exchangeTransfers.txDeposit IS NULL
-					  AND NOT accounts.accountType = 'exchange'
+					  AND NOT accounts.accountType = 'ExchangeAccount'
 					  LIMIT 1`
 
 		var (
@@ -223,7 +223,7 @@ func (db *Database) GetExchangeTransfer(ctx context.Context, txsToExchange Trans
 		}
 
 		if len(txs) == 0 {
-			logging.Debugf(ctx, "tx to deposit not found (tx to exchange %s, range blocks %v-%v, range value %v-%v, to Address %v)", txToExchange.Hash, minBlock, maxBlock, minValue, txToExchange.Value, txToExchange.ToAddress)
+			logging.Debugf(ctx, "tx to deposit not found (tx to ExchangeAccount %s, range blocks %v-%v, range value %v-%v, to Address %v)", txToExchange.Hash, minBlock, maxBlock, minValue, txToExchange.Value, txToExchange.ToAddress)
 
 			continue
 		}
@@ -232,7 +232,7 @@ func (db *Database) GetExchangeTransfer(ctx context.Context, txsToExchange Trans
 			`INSERT INTO exchangeTransfers(txDeposit, txExchange) VALUES(?,?)`,
 			txs[0].Hash, txToExchange.Hash)
 		if err != nil {
-			return nil, fmt.Errorf("can't add exchange transfer: %w", err)
+			return nil, fmt.Errorf("can't add ExchangeAccount transfer: %w", err)
 		}
 
 		transfers = append(transfers, &ExchangeTransfer{
@@ -242,6 +242,21 @@ func (db *Database) GetExchangeTransfer(ctx context.Context, txsToExchange Trans
 	}
 
 	return transfers, nil
+}
+
+func (db *Database) GetTransactionsByAddress(ctx context.Context, address string) (Transactions, error) {
+	query := `SELECT hash, nonce, blockNumber, fromAddress, transactionIndex, toAddress,
+				value, gas, gasPrice, input, contractAddress, type FROM transactions
+					WHERE ( toAddress = ?
+					OR fromAddress = ? )
+					AND value > 0`
+
+	rows, err := db.connection.QueryContext(ctx, query, address, address)
+	if err != nil {
+		return nil, fmt.Errorf("can't get txs by address: %w", err)
+	}
+
+	return scanTransactions(rows)
 }
 
 func scanTransactions(rows *sql.Rows) (txs Transactions, err error) {

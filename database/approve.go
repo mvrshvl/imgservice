@@ -27,7 +27,7 @@ const (
 		WHERE owner.countTxs < ? 	
 		AND transactions.blockNumber BETWEEN ? AND ?
 		AND transactions.type = 'approve'
-		AND NOT accounts.type IN ('exchange', 'deposit')`
+		AND NOT accounts.type IN ('ExchangeAccount', 'deposit')`
 )
 
 func (db *Database) GetSelfApproveTxs(ctx context.Context, fromBlock uint64, toBlock uint64, maxApproves uint64) (Transactions, error) {

@@ -30,7 +30,7 @@ func (ex *Exchange) AddExchange(ctx context.Context, db sqlx.ExecerContext) erro
 		ex.Address, ex.Name)
 
 	if err != nil {
-		return fmt.Errorf("can't add exchange: %w", err)
+		return fmt.Errorf("can't add ExchangeAccount: %w", err)
 	}
 
 	return nil

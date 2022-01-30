@@ -4,12 +4,12 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"nir/clustering"
 	"nir/config"
 	"nir/database"
 	"nir/di"
 	"nir/geth"
 	logging "nir/log"
+	"nir/server"
 	"path"
 	"time"
 )
@@ -35,13 +35,20 @@ func main() {
 
 	ctx = di.WithContext(ctx, container)
 
-	errNotify := make(chan error, 1)
-	subscriber, err := loadData(ctx, errNotify)
-	if err != nil {
-		log.Fatal(err)
-	}
+	srv := server.New("localhost:8080")
 
-	go clustering.Run(ctx, subscriber, errNotify)
+	errNotify := make(chan error, 1)
+
+	go func() {
+		errNotify <- srv.Run()
+	}()
+
+	//subscriber, err := loadData(ctx, errNotify)
+	//if err != nil {
+	//	log.Fatal(err)
+	//}
+	//
+	//go clustering.Run(ctx, subscriber, errNotify)
 	logging.Info(ctx, <-errNotify)
 }
 
@@ -105,7 +112,7 @@ func addBlackList(ctx context.Context, db *database.Database) error {
 	for _, blacklistAccount := range blacklist {
 		account := &database.Account{
 			Address: blacklistAccount.Address,
-			AccType: database.Scammer,
+			AccType: database.ScammerAccount,
 		}
 
 		if len(blacklistAccount.Comment) > 0 {
