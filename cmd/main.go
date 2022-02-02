@@ -4,18 +4,18 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"nir/clustering"
 	"nir/config"
 	"nir/database"
 	"nir/di"
 	"nir/geth"
 	logging "nir/log"
+	"nir/server"
 	"path"
 	"time"
 )
 
 const (
-	batchBlocksSize = 100
+	batchBlocksSize = 500
 	testRun         = true
 )
 
@@ -35,104 +35,21 @@ func main() {
 
 	ctx = di.WithContext(ctx, container)
 
-	errNotify := make(chan error, 1)
-	subscriber, err := loadData(ctx, errNotify)
-	if err != nil {
-		log.Fatal(err)
-	}
+	srv := server.New("localhost:8080")
 
-	go clustering.Run(ctx, subscriber, errNotify)
+	errNotify := make(chan error, 1)
+
+	go func() {
+		errNotify <- srv.Run()
+	}()
+
+	//subscriber, err := loadData(ctx, errNotify)
+	//if err != nil {
+	//	log.Fatal(err)
+	//}
+	//
+	//go clustering.Run(ctx, subscriber, errNotify)
 	logging.Info(ctx, <-errNotify)
-	// остановился на тестировании записи в бд
-	//logging.Info(ctx, "Prepare data...")
-	//
-	//chain, err := prepareBlockchain(ctx)
-	//if err != nil {
-	//	log.Fatal(err)
-	//}
-	//
-	//var (
-	//	ts  []*transfer.ExchangeTransfer
-	//	cfg *config.Config
-	//)
-	//
-	//err = di.FromContext(ctx).Invoke(func(c *config.Config) {
-	//	cfg = c
-	//})
-	//if err != nil {
-	//	log.Fatal(err)
-	//}
-	//
-	//var (
-	//	wg                                                 sync.WaitGroup
-	//	depositClusters, airdropClusters, selfauthClusters clustering.Clusters
-	//)
-	//
-	//logging.Info(ctx, "Start clustering.")
-	//
-	//wg.Add(3)
-	//go func() {
-	//	defer wg.Done()
-	//
-	//	ts = transfer.GetTxsToExchange(chain, cfg.Clustering.MaxBlockDiff)
-	//	depositClusters = depositreuse.Find(ts)
-	//
-	//	err = SaveClusters("deposit.json", depositClusters)
-	//	if err != nil {
-	//		log.Fatal(err)
-	//	}
-	//}()
-	//
-	//go func() {
-	//	defer wg.Done()
-	//
-	//	airdropClusters, err = airdrop.Find(chain.TokenTransfers)
-	//	if err != nil {
-	//		log.Fatal(err)
-	//	}
-	//
-	//	err = SaveClusters("airdrop.json", airdropClusters)
-	//	if err != nil {
-	//		log.Fatal(err)
-	//	}
-	//}()
-	//
-	//go func() {
-	//	defer wg.Done()
-	//
-	//	selfauthClusters = selfauth.Find(chain.Approves)
-	//
-	//	err = SaveClusters("self-auth.json", selfauthClusters)
-	//	if err != nil {
-	//		log.Fatal(err)
-	//	}
-	//}()
-	//
-	//wg.Wait()
-	//
-	//logging.Info(ctx, "Start merging.")
-	//
-	//// todo optimize this
-	//m := airdropClusters.Merge(depositClusters)
-	//
-	//err = SaveClusters("airdrop_deposit.json", m)
-	//if err != nil {
-	//	log.Fatal(err)
-	//}
-	//
-	//merged := m.Merge(selfauthClusters)
-	//
-	//err = SaveClusters("all.json", merged)
-	//if err != nil {
-	//	log.Fatal(err)
-	//}
-	//
-	//logging.Info(ctx, "Start rendering.")
-	//
-	//err = RenderGraph(airdrop.GetAirdropDistributors(chain.TokenTransfers), chain.Exchanges, cfg.Output.GraphDepositsReuse, merged, cfg.ShowSingleAccount)
-	//if err != nil {
-	//	log.Fatal(err)
-	//}
 }
 
 func loadData(ctx context.Context, errNotify chan error) (chan *database.NewBlocks, error) {
@@ -145,6 +62,11 @@ func loadData(ctx context.Context, errNotify chan error) (chan *database.NewBloc
 		}
 
 		innerErr = addExchanges(ctx, db)
+		if innerErr != nil {
+			return innerErr
+		}
+
+		innerErr = addBlackList(ctx, db)
 		if innerErr != nil {
 			return innerErr
 		}
@@ -163,18 +85,47 @@ func loadData(ctx context.Context, errNotify chan error) (chan *database.NewBloc
 }
 
 func addExchanges(ctx context.Context, db *database.Database) error {
-	if !testRun {
-		return nil
-	}
-
 	var exchanges database.Exchanges
 
-	err := geth.ParseCSV(path.Join(geth.DataDirectory, "exchanges.csv"), &exchanges)
+	err := geth.ParseCSV(path.Join(geth.StaticDirectory, "exchanges.csv"), &exchanges)
 	if err != nil {
 		return fmt.Errorf("can't parse exchanges: %w", err)
 	}
 
-	return db.AddExchanges(ctx, exchanges)
+	return exchanges.AddExchanges(ctx, db.GetConnection())
+}
+
+type Blacklist struct {
+	Address string
+	Comment string
+	Date    string
+}
+
+func addBlackList(ctx context.Context, db *database.Database) error {
+	var blacklist []Blacklist
+
+	err := geth.ParseJSON(path.Join(geth.StaticDirectory, "blacklist.json"), &blacklist)
+	if err != nil {
+		return fmt.Errorf("can't parse blacklist: %w", err)
+	}
+
+	for _, blacklistAccount := range blacklist {
+		account := &database.Account{
+			Address: blacklistAccount.Address,
+			AccType: database.ScammerAccount,
+		}
+
+		if len(blacklistAccount.Comment) > 0 {
+			account.Comment = &blacklistAccount.Comment
+		}
+
+		err = account.AddAccount(ctx, db.GetConnection())
+		if err != nil {
+			return fmt.Errorf("can't add account from blacklist: %w", err)
+		}
+	}
+
+	return nil
 }
 
 func collectData(ctx context.Context, fromBlock uint64, notifyChan chan *database.NewBlocks, errNotify chan error) {

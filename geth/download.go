@@ -2,6 +2,7 @@ package geth
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"github.com/gocarina/gocsv"
 	"nir/config"
@@ -13,7 +14,10 @@ import (
 	"strconv"
 )
 
-const DataDirectory = "./geth/data"
+const (
+	DataDirectory   = "./geth/data"
+	StaticDirectory = "./geth/data/static"
+)
 
 func DownloadData(ctx context.Context, fromBlock, toBlock uint64) (*database.NewBlocks, error) {
 	err := di.FromContext(ctx).Invoke(func(cfg *config.Config) error {
@@ -72,4 +76,13 @@ func ParseCSV(filename string, out interface{}) error {
 	}
 
 	return nil
+}
+
+func ParseJSON(filename string, out interface{}) error {
+	data, err := os.ReadFile(filename)
+	if err != nil {
+		return err
+	}
+
+	return json.Unmarshal(data, out)
 }

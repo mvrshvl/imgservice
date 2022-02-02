@@ -42,6 +42,10 @@ func (db *Database) Connect(ctx context.Context) error {
 	})
 }
 
+func (db *Database) GetConnection() *sqlx.DB {
+	return db.connection
+}
+
 func (db *Database) migrate(cfg *config.Config, direction migrate.MigrationDirection) error {
 	migrationsDirectory, err := fs.Sub(migrationsPath, "migrations")
 	if err != nil {

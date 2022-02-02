@@ -45,19 +45,19 @@ func main() {
 			log.Fatal(err)
 		}
 	}
-	//
-	//log.Println("Start self-auth...")
-	//
-	//err = selfAuth(ctx, users)
-	//if err != nil {
-	//	log.Fatal(err)
-	//}
 
-	//log.Println("Start sending transactions to exchange...")
-	//
-	//sendTransactionsToExchange(ctx, users, exchanges, countTransactions)
-	//
-	//log.Println("Closing exchanges...")
+	log.Println("Start self-auth...")
+
+	err = selfAuth(ctx, users)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	log.Println("Start sending transactions to exchange...")
+
+	sendTransactionsToExchange(ctx, users, exchanges, countTransactions)
+
+	log.Println("Closing exchanges...")
 
 	closeExchanges(exchanges)
 }

@@ -13,24 +13,26 @@ import (
 type AccountType string
 
 const (
-	eoa         AccountType = "eoa"
-	miner       AccountType = "miner"
-	deposit     AccountType = "deposit"
-	exchange    AccountType = "exchange"
-	errAccounts             = amlerror.AMLError("can't get transfer accounts")
+	eoa             AccountType = "eoa"
+	MinerAccount    AccountType = "MinerAccount"
+	deposit         AccountType = "deposit"
+	ExchangeAccount AccountType = "ExchangeAccount"
+	ScammerAccount  AccountType = "scammer"
+	errAccounts                 = amlerror.AMLError("can't get transfer accounts")
 )
 
 type Account struct {
 	Address string      `db:"Address"`
 	AccType AccountType `db:"accountType"`
 	Cluster *uint64     `db:"Cluster"`
+	Comment *string     `db:"Comment"`
 }
 
-func (db *Database) AddAccount(ctx context.Context, account *Account) error {
-	_, err := db.connection.ExecContext(ctx,
-		`INSERT IGNORE INTO accounts (Address, accountType)
-				VALUES (?, ?)`,
-		account.Address, account.AccType)
+func (account Account) AddAccount(ctx context.Context, db sqlx.ExecerContext) error {
+	_, err := db.ExecContext(ctx,
+		`INSERT IGNORE INTO accounts (address, accountType, comment)
+				VALUES (?, ?, ?)`,
+		account.Address, account.AccType, account.Comment)
 	if err != nil {
 		return fmt.Errorf("can't add account: %w", err)
 	}
@@ -49,6 +51,20 @@ func (db *Database) UpdateAccountType(ctx context.Context, address string, accTy
 	return nil
 }
 
+func (db *Database) GetAccount(ctx context.Context, address string) (*Account, error) {
+	query := `SELECT * FROM accounts
+				WHERE address = ?`
+
+	acc := new(Account)
+
+	err := db.connection.GetContext(ctx, acc, query, address)
+	if err != nil {
+		return nil, fmt.Errorf("can't get account: %w", err)
+	}
+
+	return acc, nil
+}
+
 func (db *Database) GetAccounts(ctx context.Context, addresses ...string) ([]*Account, error) {
 	query := `SELECT * FROM accounts
 				WHERE address IN ( ? )`
@@ -60,7 +76,7 @@ func (db *Database) GetAccounts(ctx context.Context, addresses ...string) ([]*Ac
 
 	rows, err := db.connection.QueryContext(ctx, queryIn, args...)
 	if err != nil {
-		return nil, fmt.Errorf("can't get exchange transfers: %w", err)
+		return nil, fmt.Errorf("can't get accounts: %w", err)
 	}
 
 	defer rows.Close()
@@ -94,7 +110,7 @@ func (db *Database) GetDepositSenders(ctx context.Context, address string, exclu
 				LEFT JOIN accounts
 				ON transactions.FromAddress = accounts.address
 				WHERE toAddress = ?
-				  AND NOT accountType = 'exchange'`
+				  AND NOT accountType = 'ExchangeAccount'`
 
 	return db.getAddresses(ctx, query, excludeAddresses, address)
 }

@@ -22,8 +22,7 @@ type Config struct {
 }
 
 type Clustering struct {
-	MaxBlockDiff uint64  `default:"10000"`
-	MaxETHDiff   float64 `default:"0.01"`
+	BatchBlocksSize uint64 `default:"false"`
 }
 
 type Log struct {

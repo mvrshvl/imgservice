@@ -3,10 +3,12 @@ package database
 import (
 	"context"
 	"fmt"
+	"github.com/jmoiron/sqlx"
+	"strings"
 )
 
 type Exchange struct {
-	Address string `csv:"Address" db:"Address"`
+	Address string `csv:"address" db:"address"`
 	Name    string `csv:"name" db:"name"`
 }
 
@@ -21,23 +23,23 @@ func (exchanges Exchanges) MapAddresses() map[string]struct{} {
 	return exchs
 }
 
-func (db *Database) AddExchange(ctx context.Context, ex *Exchange) error {
-	_, err := db.connection.ExecContext(ctx,
+func (ex *Exchange) AddExchange(ctx context.Context, db sqlx.ExecerContext) error {
+	_, err := db.ExecContext(ctx,
 		`INSERT INTO exchanges(Address, name)
     			VALUES(?,?)`,
 		ex.Address, ex.Name)
 
 	if err != nil {
-		return fmt.Errorf("can't add exchange: %w", err)
+		return fmt.Errorf("can't add ExchangeAccount: %w", err)
 	}
 
 	return nil
 }
 
-func (db *Database) AddExchanges(ctx context.Context, exs Exchanges) error {
+func (exs Exchanges) AddExchanges(ctx context.Context, db sqlx.ExecerContext) error {
 	for _, ex := range exs {
-		err := db.AddExchange(ctx, ex)
-		if err != nil {
+		err := ex.AddExchange(ctx, db)
+		if err != nil && !strings.Contains(err.Error(), "Duplicate entry") {
 			return err
 		}
 	}

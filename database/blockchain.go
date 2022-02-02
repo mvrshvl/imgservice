@@ -2,6 +2,7 @@ package database
 
 import (
 	"context"
+	"database/sql"
 	"nir/di"
 )
 
@@ -30,31 +31,23 @@ func GetNewBlocks(transactions []*Transaction, blocks []*Block, exchanges []*Exc
 
 func (nb *NewBlocks) Save(ctx context.Context) error {
 	return di.FromContext(ctx).Invoke(func(db *Database) error {
-		err := db.AddBlocks(ctx, nb.Blocks)
-		if err != nil {
-			return err
-		}
+		return db.ExecuteTx(ctx, func(ctx context.Context, tx *sql.Tx) error {
+			err := nb.Blocks.AddBlocks(ctx, tx)
+			if err != nil {
+				return err
+			}
 
-		err = db.AddTransactions(ctx, nb.Transactions)
-		if err != nil {
-			return err
-		}
+			err = nb.Transactions.AddTransactions(ctx, tx)
+			if err != nil {
+				return err
+			}
 
-		err = db.AddExchanges(ctx, nb.Exchanges)
-		if err != nil {
-			return err
-		}
+			err = nb.TokenTransfers.UpdateTokenTransfers(ctx, tx)
+			if err != nil {
+				return err
+			}
 
-		err = db.UpdateTokenTransfers(ctx, nb.TokenTransfers)
-		if err != nil {
-			return err
-		}
-
-		err = db.UpdateApproves(ctx, nb.Approves)
-		if err != nil {
-			return err
-		}
-
-		return nil
+			return nb.Approves.UpdateApproves(ctx, tx)
+		})
 	})
 }

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/jmoiron/sqlx"
+	"math/big"
 	logging "nir/log"
 )
 
@@ -18,49 +19,49 @@ const (
 )
 
 type Transaction struct {
-	Hash             string  `csv:"hash" db:"hash"`
-	Nonce            uint64  `csv:"nonce" db:"nonce"`
-	BlockNumber      uint64  `csv:"block_number" db:"blockNumber"`
-	TransactionIndex *uint64 `csv:"transaction_index" db:"transactionIndex"`
-	FromAddress      string  `csv:"from_address" db:"fromAddress"`
-	ToAddress        string  `csv:"to_address" db:"toAddress"`
-	Value            int64   `csv:"value" db:"value"`
-	Gas              uint64  `csv:"gas" db:"gas"`
-	GasPrice         uint64  `csv:"gas_price" db:"gasPrice"`
-	Input            string  `csv:"input" db:"input"`
-	ContractAddress  *string `db:"contractAddress"`
-	Type             *TxType `db:"type"`
+	Hash             string   `csv:"hash" db:"hash"`
+	Nonce            uint64   `csv:"nonce" db:"nonce"`
+	BlockNumber      uint64   `csv:"block_number" db:"blockNumber"`
+	TransactionIndex *uint64  `csv:"transaction_index" db:"transactionIndex"`
+	FromAddress      string   `csv:"from_address" db:"fromAddress"`
+	ToAddress        string   `csv:"to_address" db:"toAddress"`
+	Value            *big.Int `csv:"value" db:"value"`
+	Gas              *big.Int `csv:"gas" db:"gas"`
+	GasPrice         *big.Int `csv:"gas_price" db:"gasPrice"`
+	Input            string   `csv:"input" db:"input"`
+	ContractAddress  *string  `db:"contractAddress"`
+	Type             *TxType  `db:"type"`
 }
 
 type Transactions []*Transaction
 
-func (db *Database) AddTransaction(ctx context.Context, tx *Transaction) error {
-	_, err := db.connection.ExecContext(ctx,
+func (tx *Transaction) AddTransaction(ctx context.Context, dbTx *sql.Tx) error {
+	_, err := dbTx.ExecContext(ctx,
 		`INSERT INTO transactions(hash, nonce, blockNumber, transactionIndex, FromAddress, toAddress, value, gas, gasPrice, input)
     			VALUES(?,?,?,?,?,?,?,?,?,?)`,
-		tx.Hash, tx.Nonce, tx.BlockNumber, tx.TransactionIndex, tx.FromAddress, tx.ToAddress, tx.Value, tx.Gas, tx.GasPrice, tx.Input)
+		tx.Hash, tx.Nonce, tx.BlockNumber, tx.TransactionIndex, tx.FromAddress, tx.ToAddress, tx.Value.Int64(), tx.Gas.Int64(), tx.GasPrice.Int64(), tx.Input)
 
 	if err != nil {
 		return fmt.Errorf("can't add tx: %w", err)
 	}
 
-	err = db.AddAccount(ctx, &Account{
+	err = Account{
 		Address: tx.FromAddress,
 		AccType: eoa,
-	})
+	}.AddAccount(ctx, dbTx)
 	if err != nil {
 		return err
 	}
 
-	return db.AddAccount(ctx, &Account{
-		Address: tx.ToAddress,
+	return Account{
+		Address: tx.FromAddress,
 		AccType: eoa,
-	})
+	}.AddAccount(ctx, dbTx)
 }
 
-func (db *Database) AddTransactions(ctx context.Context, txs Transactions) error {
+func (txs Transactions) AddTransactions(ctx context.Context, dbTx *sql.Tx) error {
 	for _, tx := range txs {
-		err := db.AddTransaction(ctx, tx)
+		err := tx.AddTransaction(ctx, dbTx)
 		if err != nil {
 			return err
 		}
@@ -69,8 +70,8 @@ func (db *Database) AddTransactions(ctx context.Context, txs Transactions) error
 	return nil
 }
 
-func (db *Database) UpdateTxType(ctx context.Context, hash, toAddress, contractAddr string, value int64, t TxType) error {
-	_, err := db.connection.ExecContext(ctx,
+func UpdateTxType(ctx context.Context, dbTx *sql.Tx, hash, toAddress, contractAddr string, value int64, t TxType) error {
+	_, err := dbTx.ExecContext(ctx,
 		`UPDATE transactions SET toAddress = ?, contractAddress = ?, type = ?, value = ? WHERE hash = ?`,
 		toAddress, contractAddr, t, value, hash)
 
@@ -81,8 +82,8 @@ func (db *Database) UpdateTxType(ctx context.Context, hash, toAddress, contractA
 	return nil
 }
 
-func (db *Database) UpdateTxDeploy(ctx context.Context, hash, contractAddr string, value int64, t TxType) error {
-	_, err := db.connection.ExecContext(ctx,
+func updateTxDeploy(ctx context.Context, tx *sql.Tx, hash, contractAddr string, value int64, t TxType) error {
+	_, err := tx.ExecContext(ctx,
 		`UPDATE transactions SET contractAddress = ?, type = ?, value = ? WHERE hash = ?`,
 		contractAddr, t, value, hash)
 
@@ -93,10 +94,10 @@ func (db *Database) UpdateTxDeploy(ctx context.Context, hash, contractAddr strin
 	return nil
 }
 
-func (db *Database) UpdateTokenTransfers(ctx context.Context, txs TokenTransfers) error {
+func (txs TokenTransfers) UpdateTokenTransfers(ctx context.Context, dbTx *sql.Tx) error {
 	for _, tx := range txs {
 		if tx.SourceAddress == address0 {
-			err := db.UpdateTxDeploy(ctx, tx.TxHash, tx.ContractAddress, tx.Value, TxTransfer)
+			err := updateTxDeploy(ctx, dbTx, tx.TxHash, tx.ContractAddress, tx.Value, TxTransfer)
 			if err != nil {
 				return err
 			}
@@ -104,7 +105,7 @@ func (db *Database) UpdateTokenTransfers(ctx context.Context, txs TokenTransfers
 			continue
 		}
 
-		err := db.UpdateTxType(ctx, tx.TxHash, tx.TargetAddress, tx.ContractAddress, tx.Value, TxTransfer)
+		err := UpdateTxType(ctx, dbTx, tx.TxHash, tx.TargetAddress, tx.ContractAddress, tx.Value, TxTransfer)
 		if err != nil {
 			return err
 		}
@@ -113,9 +114,9 @@ func (db *Database) UpdateTokenTransfers(ctx context.Context, txs TokenTransfers
 	return nil
 }
 
-func (db *Database) UpdateApproves(ctx context.Context, txs ERC20Approves) error {
+func (txs ERC20Approves) UpdateApproves(ctx context.Context, dbTx *sql.Tx) error {
 	for _, tx := range txs {
-		err := db.UpdateTxType(ctx, tx.TxHash, tx.ToAddress, tx.ContractAddress, 0, TxApprove)
+		err := UpdateTxType(ctx, dbTx, tx.TxHash, tx.ToAddress, tx.ContractAddress, 0, TxApprove)
 		if err != nil {
 			return err
 		}
@@ -152,7 +153,7 @@ func (db *Database) GetTxsToExchange(ctx context.Context, txs Transactions) (Tra
 			return nil, nil
 		}
 
-		return nil, fmt.Errorf("can't get exchange transfers: %w", err)
+		return nil, fmt.Errorf("can't get ExchangeAccount transfers: %w", err)
 	}
 
 	txsToExchange, err := scanTransactions(rows)
@@ -160,14 +161,14 @@ func (db *Database) GetTxsToExchange(ctx context.Context, txs Transactions) (Tra
 		return nil, err
 	}
 
-	// update accounts set deposit and exchange type
+	// update accounts set deposit and ExchangeAccount type
 	for _, txToExchange := range txsToExchange {
 		err = db.UpdateAccountType(ctx, txToExchange.FromAddress, deposit)
 		if err != nil {
 			return nil, err
 		}
 
-		err = db.UpdateAccountType(ctx, txToExchange.ToAddress, exchange)
+		err = db.UpdateAccountType(ctx, txToExchange.ToAddress, ExchangeAccount)
 		if err != nil {
 			return nil, err
 		}
@@ -189,7 +190,7 @@ func (db *Database) GetExchangeTransfer(ctx context.Context, txsToExchange Trans
 					  AND transactions.blockNumber BETWEEN ? AND ?
 					  AND transactions.value BETWEEN ? AND ?
 					  AND exchangeTransfers.txDeposit IS NULL
-					  AND NOT accounts.accountType = 'exchange'
+					  AND NOT accounts.accountType = 'ExchangeAccount'
 					  LIMIT 1`
 
 		var (
@@ -206,8 +207,8 @@ func (db *Database) GetExchangeTransfer(ctx context.Context, txsToExchange Trans
 			maxBlock = txToExchange.BlockNumber - 1
 		}
 
-		if float64(txToExchange.Value) > float64(txToExchange.Gas*txToExchange.GasPrice)*diffGasKoef {
-			minValue = float64(txToExchange.Value) - float64(txToExchange.Gas*txToExchange.GasPrice)*diffGasKoef
+		if float64(txToExchange.Value.Int64()) > float64(txToExchange.Gas.Int64()*txToExchange.GasPrice.Int64())*diffGasKoef {
+			minValue = float64(txToExchange.Value.Int64()) - float64(txToExchange.Gas.Int64()*txToExchange.GasPrice.Int64())*diffGasKoef
 		}
 		rows, err := db.connection.QueryContext(ctx, query, txToExchange.FromAddress,
 			minBlock, maxBlock,
@@ -222,7 +223,7 @@ func (db *Database) GetExchangeTransfer(ctx context.Context, txsToExchange Trans
 		}
 
 		if len(txs) == 0 {
-			logging.Debugf(ctx, "tx to deposit not found (tx to exchange %s, range blocks %v-%v, range value %v-%v, to Address %v)", txToExchange.Hash, minBlock, maxBlock, minValue, txToExchange.Value, txToExchange.ToAddress)
+			logging.Debugf(ctx, "tx to deposit not found (tx to ExchangeAccount %s, range blocks %v-%v, range value %v-%v, to Address %v)", txToExchange.Hash, minBlock, maxBlock, minValue, txToExchange.Value, txToExchange.ToAddress)
 
 			continue
 		}
@@ -231,7 +232,7 @@ func (db *Database) GetExchangeTransfer(ctx context.Context, txsToExchange Trans
 			`INSERT INTO exchangeTransfers(txDeposit, txExchange) VALUES(?,?)`,
 			txs[0].Hash, txToExchange.Hash)
 		if err != nil {
-			return nil, fmt.Errorf("can't add exchange transfer: %w", err)
+			return nil, fmt.Errorf("can't add ExchangeAccount transfer: %w", err)
 		}
 
 		transfers = append(transfers, &ExchangeTransfer{
@@ -241,6 +242,21 @@ func (db *Database) GetExchangeTransfer(ctx context.Context, txsToExchange Trans
 	}
 
 	return transfers, nil
+}
+
+func (db *Database) GetTransactionsByAddress(ctx context.Context, address string) (Transactions, error) {
+	query := `SELECT hash, nonce, blockNumber, fromAddress, transactionIndex, toAddress,
+				value, gas, gasPrice, input, contractAddress, type FROM transactions
+					WHERE ( toAddress = ?
+					OR fromAddress = ? )
+					AND value > 0`
+
+	rows, err := db.connection.QueryContext(ctx, query, address, address)
+	if err != nil {
+		return nil, fmt.Errorf("can't get txs by address: %w", err)
+	}
+
+	return scanTransactions(rows)
 }
 
 func scanTransactions(rows *sql.Rows) (txs Transactions, err error) {
