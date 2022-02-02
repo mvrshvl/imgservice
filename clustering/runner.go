@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"nir/clustering/airdrop"
 	"nir/clustering/depositreuse"
+	"nir/clustering/selfauth"
 	"nir/database"
 	"sort"
 )
@@ -33,5 +34,10 @@ func clustering(ctx context.Context, newBlocks *database.NewBlocks) error {
 		return newBlocks.Blocks[i].Number > newBlocks.Blocks[j].Number
 	})
 
-	return airdrop.Run(ctx, newBlocks.Blocks[0].Number)
+	err = airdrop.Run(ctx, newBlocks.Blocks[0].Number)
+	if err != nil {
+		return fmt.Errorf("can't clustering deposit reuse: %w", err)
+	}
+
+	return selfauth.Run(ctx, newBlocks.Blocks[0].Number)
 }

@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	batchBlocksSize = 10
+	batchBlocksSize = 100
 	testRun         = true
 )
 

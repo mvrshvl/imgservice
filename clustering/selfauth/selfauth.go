@@ -12,7 +12,7 @@ const (
 	blockDiff   = uint64(1000)
 )
 
-func Find(ctx context.Context, toBlock uint64) error {
+func Run(ctx context.Context, toBlock uint64) error {
 	txs, err := getSelfApproves(ctx, common.GetFromBlock(toBlock, blockDiff), toBlock, maxApproves)
 	if err != nil {
 		return err
