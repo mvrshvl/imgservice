@@ -19,7 +19,7 @@ func (db *Database) AddExchangeTransfer(ctx context.Context, txExchangeHash, txD
     			VALUES(?,?)`,
 		txDepositHash, txExchangeHash)
 	if err != nil {
-		return fmt.Errorf("can't add ExchangeAccount transfer: %w", err)
+		return fmt.Errorf("can't add exchange transfer: %w", err)
 	}
 
 	return nil

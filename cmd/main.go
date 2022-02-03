@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"nir/clustering"
 	"nir/config"
 	"nir/database"
 	"nir/di"
@@ -40,15 +41,15 @@ func main() {
 	errNotify := make(chan error, 1)
 
 	go func() {
-		errNotify <- srv.Run()
+		errNotify <- srv.Run(ctx)
 	}()
 
-	//subscriber, err := loadData(ctx, errNotify)
-	//if err != nil {
-	//	log.Fatal(err)
-	//}
-	//
-	//go clustering.Run(ctx, subscriber, errNotify)
+	subscriber, err := loadData(ctx, errNotify)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	go clustering.Run(ctx, subscriber, errNotify)
 	logging.Info(ctx, <-errNotify)
 }
 

@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"github.com/gin-gonic/gin"
 	"net/http"
 )
@@ -19,11 +20,11 @@ func New(addr string) *Server {
 	}
 }
 
-func (s *Server) Run() error {
+func (s *Server) Run(ctx context.Context) error {
 	s.Router = gin.Default()
 
 	clusterController := NewController()
-	clusterController.Group(s.Router)
+	clusterController.GroupWithCtx(ctx)(s.Router)
 
 	s.Router.GET("/", func(ctx *gin.Context) {
 		ctx.Data(http.StatusOK, "text/html; charset=utf-8", []byte(html))

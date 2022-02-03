@@ -11,7 +11,7 @@ database:
   password : "testPASS25!"
   name : "test"
   driver : "mysql"
-  clean: true
+  clean: false
 
 ethereum:
   address : "http://localhost:59047"

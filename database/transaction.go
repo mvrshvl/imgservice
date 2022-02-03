@@ -54,7 +54,7 @@ func (tx *Transaction) AddTransaction(ctx context.Context, dbTx *sql.Tx) error {
 	}
 
 	return Account{
-		Address: tx.FromAddress,
+		Address: tx.ToAddress,
 		AccType: eoa,
 	}.AddAccount(ctx, dbTx)
 }
@@ -153,7 +153,7 @@ func (db *Database) GetTxsToExchange(ctx context.Context, txs Transactions) (Tra
 			return nil, nil
 		}
 
-		return nil, fmt.Errorf("can't get ExchangeAccount transfers: %w", err)
+		return nil, fmt.Errorf("can't get exchange transfers: %w", err)
 	}
 
 	txsToExchange, err := scanTransactions(rows)
@@ -190,7 +190,7 @@ func (db *Database) GetExchangeTransfer(ctx context.Context, txsToExchange Trans
 					  AND transactions.blockNumber BETWEEN ? AND ?
 					  AND transactions.value BETWEEN ? AND ?
 					  AND exchangeTransfers.txDeposit IS NULL
-					  AND NOT accounts.accountType = 'ExchangeAccount'
+					  AND NOT accounts.accountType = 'exchange'
 					  LIMIT 1`
 
 		var (
@@ -223,7 +223,7 @@ func (db *Database) GetExchangeTransfer(ctx context.Context, txsToExchange Trans
 		}
 
 		if len(txs) == 0 {
-			logging.Debugf(ctx, "tx to deposit not found (tx to ExchangeAccount %s, range blocks %v-%v, range value %v-%v, to Address %v)", txToExchange.Hash, minBlock, maxBlock, minValue, txToExchange.Value, txToExchange.ToAddress)
+			logging.Debugf(ctx, "tx to deposit not found (tx to exchange %s, range blocks %v-%v, range value %v-%v, to Address %v)", txToExchange.Hash, minBlock, maxBlock, minValue, txToExchange.Value, txToExchange.ToAddress)
 
 			continue
 		}
@@ -245,7 +245,7 @@ func (db *Database) GetExchangeTransfer(ctx context.Context, txsToExchange Trans
 }
 
 func (db *Database) GetTransactionsByAddress(ctx context.Context, address string) (Transactions, error) {
-	query := `SELECT hash, nonce, blockNumber, fromAddress, transactionIndex, toAddress,
+	query := `SELECT hash, nonce, blockNumber, transactionIndex, fromAddress, toAddress,
 				value, gas, gasPrice, input, contractAddress, type FROM transactions
 					WHERE ( toAddress = ?
 					OR fromAddress = ? )
@@ -261,8 +261,9 @@ func (db *Database) GetTransactionsByAddress(ctx context.Context, address string
 
 func scanTransactions(rows *sql.Rows) (txs Transactions, err error) {
 	for rows.Next() {
-		var tx Transaction
 
+		var value, gas, gasPrice string
+		var tx Transaction
 		err = rows.Scan(
 			&tx.Hash,
 			&tx.Nonce,
@@ -270,16 +271,20 @@ func scanTransactions(rows *sql.Rows) (txs Transactions, err error) {
 			&tx.TransactionIndex,
 			&tx.FromAddress,
 			&tx.ToAddress,
-			&tx.Value,
-			&tx.Gas,
-			&tx.GasPrice,
+			&value,
+			&gas,
+			&gasPrice,
 			&tx.Input,
 			&tx.ContractAddress,
 			&tx.Type,
 		)
 
+		tx.Value, _ = big.NewInt(0).SetString(value, 10)
+		tx.Gas, _ = big.NewInt(0).SetString(gas, 10)
+		tx.GasPrice, _ = big.NewInt(0).SetString(gasPrice, 10)
+
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("scan txs error: %w", err)
 		}
 
 		txs = append(txs, &tx)

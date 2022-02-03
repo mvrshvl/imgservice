@@ -58,20 +58,14 @@ func (n *Node) linking(ctx context.Context) error {
 		return err
 	}
 
-	if len(txs) > 1000 {
-		return nil
-	}
-
 	for _, tx := range txs {
 		address := tx.FromAddress
 
-		if tx.ToAddress == n.address {
+		if address == n.address {
 			address = tx.ToAddress
-		} else {
-			address = tx.FromAddress
 		}
 
-		if address == n.parent.address {
+		if n.parent != nil && address == n.parent.address {
 			continue
 		}
 

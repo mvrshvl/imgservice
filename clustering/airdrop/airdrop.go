@@ -2,6 +2,7 @@ package airdrop
 
 import (
 	"context"
+	"fmt"
 	"nir/clustering/common"
 	"nir/database"
 	"nir/di"
@@ -15,13 +16,13 @@ const (
 func Run(ctx context.Context, toBlock uint64) error {
 	airdrops, err := getAirdrops(ctx, common.GetFromBlock(toBlock, blockDiff), toBlock, minAirdropAccounts)
 	if err != nil {
-		return err
+		return fmt.Errorf("can't get airdrops %w", err)
 	}
 
 	for _, airdrop := range airdrops {
 		err = clustering(ctx, airdrop)
 		if err != nil {
-			return err
+			return fmt.Errorf("error clustering: %w", err)
 		}
 	}
 

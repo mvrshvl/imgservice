@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-const ConfigPath = "./config"
+const ConfigPath = "./test-config"
 
 type Config struct {
 	Clustering

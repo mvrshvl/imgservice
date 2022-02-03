@@ -13,7 +13,7 @@ const errAccounts = amlerror.AMLError("can't get transfer accounts")
 func Run(ctx context.Context, txs database.Transactions) error {
 	exchangeTransfers, err := getExchangeTransfers(ctx, txs)
 	if err != nil {
-		return err
+		return fmt.Errorf("can't get exchange transfers %w", err)
 	}
 
 	for _, transfer := range exchangeTransfers {

@@ -36,7 +36,7 @@ func clustering(ctx context.Context, newBlocks *database.NewBlocks) error {
 
 	err = airdrop.Run(ctx, newBlocks.Blocks[0].Number)
 	if err != nil {
-		return fmt.Errorf("can't clustering deposit reuse: %w", err)
+		return fmt.Errorf("can't clustering airdrop: %w", err)
 	}
 
 	return selfauth.Run(ctx, newBlocks.Blocks[0].Number)

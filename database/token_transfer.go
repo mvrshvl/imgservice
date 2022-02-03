@@ -21,13 +21,13 @@ type TokenTransfer struct {
 type TokenTransfers []*TokenTransfer
 
 func (db *Database) GetAirdrops(ctx context.Context, fromBlock uint64, toBlock uint64, minTransfers uint64) ([]*Airdrop, error) {
-	queryAirdrop := `SELECT hash, nonce, blockNumber, transactionIndex, FromAddress, toAddress, value, gas, gasPrice, input, ContractAddress, type FROM transactions
-    INNER JOIN (SELECT FromAddress as f, value as v, ContractAddress as c, COUNT(*) as count FROM transactions
+	queryAirdrop := `SELECT hash, nonce, blockNumber, transactionIndex, fromAddress, toAddress, value, gas, gasPrice, input, contractAddress, type FROM transactions
+    INNER JOIN (SELECT fromAddress as f, value as v, contractAddress as c, COUNT(*) as count FROM transactions
                 WHERE type = 'transfer'
                   AND blockNumber BETWEEN ? AND ?
-                GROUP BY FromAddress, value) g
-    ON transactions.FromAddress = g.f
-        AND transactions.ContractAddress = g.c
+                GROUP BY fromAddress, value) g
+    ON transactions.fromAddress = g.f
+        AND transactions.contractAddress = g.c
         AND transactions.value = g.v
         WHERE g.count > ?
     	AND transactions.type = 'transfer'
@@ -106,7 +106,7 @@ func groupByAirdrop(txs Transactions) (airdrops []*Airdrop) {
 
 // FilterOwners вернуть если addr это владелец контракта или для адреса существует approve на этот контракт
 func (db *Database) FilterOwners(ctx context.Context, airdrops []*Airdrop) (filtered []*Airdrop, err error) {
-	query := `SELECT hash, nonce, blockNumber, transactionIndex, fromAddress, toAddress, value, gas, gasPrice, input, contractAddress, type FROM transactions
+	query := `SELECT hash, nonce, blockNumber, transactionIndex, fromAddress, toAddress, input, contractAddress, type FROM transactions
 				WHERE ContractAddress = ?
 				AND ((type = 'transfer'
             	AND toAddress = ''

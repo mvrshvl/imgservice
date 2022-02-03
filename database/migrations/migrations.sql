@@ -22,9 +22,9 @@ CREATE TABLE IF NOT EXISTS transactions
     transactionIndex INT UNSIGNED,
     fromAddress     VARCHAR(42),
     toAddress       VARCHAR(42),
-    value           DECIMAL(75, 0),
-    gas             DECIMAL(75, 0),
-    gasPrice        DECIMAL(75, 0),
+    value           VARCHAR(80),
+    gas             VARCHAR(80),
+    gasPrice        VARCHAR(80),
     input           TEXT,
     contractAddress VARCHAR(42),
     type            ENUM('transfer', 'approve'),
@@ -61,6 +61,8 @@ CREATE TABLE IF NOT EXISTS accounts
 
     FOREIGN KEY (cluster) REFERENCES clusters(id)
 );
+
+SET GLOBAL sql_mode=(SELECT REPLACE(@@sql_mode,'ONLY_FULL_GROUP_BY',''));
 
 -- +migrate Down
 DROP TABLE IF EXISTS exchangeTransfers;

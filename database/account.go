@@ -14,18 +14,18 @@ type AccountType string
 
 const (
 	eoa             AccountType = "eoa"
-	MinerAccount    AccountType = "MinerAccount"
+	MinerAccount    AccountType = "miner"
 	deposit         AccountType = "deposit"
-	ExchangeAccount AccountType = "ExchangeAccount"
+	ExchangeAccount AccountType = "exchange"
 	ScammerAccount  AccountType = "scammer"
 	errAccounts                 = amlerror.AMLError("can't get transfer accounts")
 )
 
 type Account struct {
-	Address string      `db:"Address"`
+	Address string      `db:"address"`
 	AccType AccountType `db:"accountType"`
-	Cluster *uint64     `db:"Cluster"`
-	Comment *string     `db:"Comment"`
+	Cluster *uint64     `db:"cluster"`
+	Comment *string     `db:"comment"`
 }
 
 func (account Account) AddAccount(ctx context.Context, db sqlx.ExecerContext) error {
@@ -93,6 +93,7 @@ func scanAccounts(rows *sql.Rows) ([]*Account, error) {
 		err := rows.Scan(
 			&acc.Address,
 			&acc.AccType,
+			&acc.Comment,
 			&acc.Cluster,
 		)
 		if err != nil {
@@ -110,7 +111,7 @@ func (db *Database) GetDepositSenders(ctx context.Context, address string, exclu
 				LEFT JOIN accounts
 				ON transactions.FromAddress = accounts.address
 				WHERE toAddress = ?
-				  AND NOT accountType = 'ExchangeAccount'`
+				  AND NOT accountType = 'exchange'`
 
 	return db.getAddresses(ctx, query, excludeAddresses, address)
 }
@@ -238,8 +239,8 @@ func (db *Database) MergeClusters(ctx context.Context, src, dst uint64) error {
 }
 
 func (db *Database) GetSenderAndReceiver(ctx context.Context, fromAddress, toAddress string) (sender, receiver *Account, err error) {
-	accounts, innerErr := db.GetAccounts(ctx, fromAddress, toAddress)
-	if innerErr != nil {
+	accounts, err := db.GetAccounts(ctx, fromAddress, toAddress)
+	if err != nil {
 		return nil, nil, err
 	}
 
