@@ -2,7 +2,7 @@ package linking
 
 import (
 	"context"
-	"nir/clustering/common"
+	"fmt"
 	"nir/database"
 	"nir/di"
 )
@@ -19,18 +19,44 @@ type Node struct {
 	parent        *Node
 	txsWithParent database.Transactions
 	childs        map[string]*Node
+	cache         map[string]*Node
 }
 
-func New(address string, parent *Node) *Node {
+func New(address string, parent *Node, cache map[string]*Node) *Node {
 	return &Node{
 		address: address,
 		parent:  parent,
 		childs:  make(map[string]*Node),
+		cache:   cache,
 	}
 }
 
-func Run(ctx context.Context, address string) (*AddressLinks, error) {
-	root := New(address, nil)
+func Run(ctx context.Context, address string) (*[]AddressLinks, error) {
+	entity, err := getEntity(ctx, address)
+	if err != nil {
+		return nil, err
+	}
+
+	nodesCh := make(chan *Node, len(entity.Accounts))
+	// надо переписать на кластеризацию внутри Link
+	for _, addr := range entity.Accounts {
+		addr := addr
+		go func() {
+			_, err := LinkNode(ctx, addr.Address)
+			if err != nil {
+				fmt.Println("can't link node", addr.Address, err)
+			}
+		}()
+	}
+	var (
+		nodes []*Node
+	)
+}
+
+func LinkNode(ctx context.Context, address string) (*AddressLinks, error) {
+	cache := make(map[string]*Node)
+
+	root := New(address, nil, cache)
 
 	err := root.linking(ctx)
 	if err != nil {
@@ -49,7 +75,7 @@ func (n *Node) linking(ctx context.Context) error {
 		return err
 	}
 
-	if acc.AccType == database.MinerAccount || acc.AccType == database.ExchangeAccount {
+	if acc.AccType == database.MinerAccount || acc.AccType == database.ExchangeAccount && n.parent != nil {
 		return nil
 	}
 
@@ -69,26 +95,81 @@ func (n *Node) linking(ctx context.Context) error {
 			continue
 		}
 
-		if ch, ok := n.childs[address]; ok {
-			ch.txsWithParent = append(ch.txsWithParent, tx)
+		if n.parent != nil && n.isCycle(address) {
+			continue
 		}
 
-		node := New(address, n)
+		if ch, ok := n.childs[address]; ok {
+			ch.txsWithParent = append(ch.txsWithParent, tx)
 
-		node.childs[node.address] = node
+			continue
+		}
 
-		err := node.linking(ctx)
+		cachedNode := n.getCachedNode(address)
+		if cachedNode != nil {
+			n.childs[cachedNode.address] = cachedNode
+			cachedNode.txsWithParent = append(cachedNode.txsWithParent, tx)
+
+			continue
+		}
+
+		err := n.addChild(address, tx).linking(ctx)
 		if err != nil {
 			return err
 		}
 	}
 
+	n.cache[n.address] = n
+
 	return nil
+}
+
+func (n *Node) addChild(address string, tx *database.Transaction) *Node {
+	child := New(address, n, n.cache)
+
+	n.childs[child.address] = child
+	child.txsWithParent = append(child.txsWithParent, tx)
+
+	return child
+}
+
+func (n *Node) isCycle(address string) bool {
+	if n.address == address {
+		return true
+	}
+
+	if n.parent == nil {
+		return false
+	}
+
+	return n.parent.isCycle(address)
+}
+
+func (n *Node) getCachedNode(address string) *Node {
+	cached, ok := n.cache[address]
+	if !ok {
+		return nil
+	}
+
+	copyCached := New(cached.address, n.parent, n.cache)
+	copyCached.childs = cached.childs
+
+	return copyCached
 }
 
 func getAccount(ctx context.Context, address string) (acc *database.Account, err error) {
 	err = di.FromContext(ctx).Invoke(func(db *database.Database) (innerErr error) {
 		acc, innerErr = db.GetAccount(ctx, address)
+
+		return innerErr
+	})
+
+	return
+}
+
+func getEntity(ctx context.Context, address string) (entity *database.Entity, err error) {
+	err = di.FromContext(ctx).Invoke(func(db *database.Database) (innerErr error) {
+		entity, innerErr = db.GetEntity(ctx, address)
 
 		return innerErr
 	})
@@ -103,7 +184,7 @@ func getTransactions(ctx context.Context, address string) (txs database.Transact
 			return innerErr
 		}
 
-		return common.Clustering(ctx, txs)
+		return nil
 	})
 
 	return
@@ -120,7 +201,7 @@ func (node *Node) splitByCurrency() map[string]*Node {
 		}
 
 		if _, ok := linksByCurrency[currency]; !ok {
-			linksByCurrency[currency] = New(node.address, node.parent)
+			linksByCurrency[currency] = New(node.address, node.parent, node.cache)
 		}
 
 		linksByCurrency[currency].txsWithParent = append(linksByCurrency[currency].txsWithParent, tx)
