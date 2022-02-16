@@ -7,18 +7,21 @@ import (
 	"nir/di"
 )
 
-const wei = "wei"
+const (
+	wei = "wei"
+)
 
 type AddressLinks struct {
 	AllLinks        *Node
 	LinksByCurrency map[string]*Node
 }
 
+// Node : If the account is empty, then the node is a cluster, where children are cluster accounts
 type Node struct {
-	account       *database.Account
+	account       *database.Account // cluster has nil account
 	parent        *Node
 	txsWithParent database.Transactions
-	childs        map[string]*Node
+	children      map[string]*Node
 	cache         map[string]*Node
 }
 
@@ -29,10 +32,10 @@ func New(ctx context.Context, address string, parent *Node, cache map[string]*No
 	}
 
 	return &Node{
-		account: acc,
-		parent:  parent,
-		childs:  make(map[string]*Node),
-		cache:   cache,
+		account:  acc,
+		parent:   parent,
+		children: make(map[string]*Node),
+		cache:    cache,
 	}, nil
 }
 
@@ -115,7 +118,7 @@ func (n *Node) linking(ctx context.Context) error {
 			continue
 		}
 
-		if ch, ok := n.childs[address]; ok {
+		if ch, ok := n.children[address]; ok {
 			ch.txsWithParent = append(ch.txsWithParent, tx)
 
 			continue
@@ -127,7 +130,7 @@ func (n *Node) linking(ctx context.Context) error {
 		}
 
 		if cachedNode != nil {
-			n.childs[cachedNode.account.Address] = cachedNode
+			n.children[cachedNode.account.Address] = cachedNode
 			cachedNode.txsWithParent = append(cachedNode.txsWithParent, tx)
 
 			continue
@@ -155,7 +158,7 @@ func (n *Node) addChild(ctx context.Context, address string, tx *database.Transa
 		return nil, err
 	}
 
-	n.childs[child.account.Address] = child
+	n.children[child.account.Address] = child
 	child.txsWithParent = append(child.txsWithParent, tx)
 
 	return child, nil
@@ -184,7 +187,7 @@ func (n *Node) getCachedNode(ctx context.Context, address string) (*Node, error)
 		return nil, err
 	}
 
-	copyCached.childs = cached.childs
+	copyCached.children = cached.children
 
 	return copyCached, nil
 }
@@ -242,7 +245,7 @@ func (node *Node) splitByCurrency(ctx context.Context) (linksByCurrency map[stri
 		linksByCurrency[currency].txsWithParent = append(linksByCurrency[currency].txsWithParent, tx)
 	}
 
-	for _, node := range node.childs {
+	for _, node := range node.children {
 		childLinks, err := node.splitByCurrency(ctx)
 		if err != nil {
 			return nil, err
@@ -250,7 +253,7 @@ func (node *Node) splitByCurrency(ctx context.Context) (linksByCurrency map[stri
 
 		for c, child := range childLinks {
 			if links, ok := linksByCurrency[c]; ok {
-				links.childs[child.account.Address] = child
+				links.children[child.account.Address] = child
 			}
 		}
 	}

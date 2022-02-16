@@ -64,7 +64,6 @@ CREATE TABLE IF NOT EXISTS accounts
 
 CREATE TABLE IF NOT EXIST accountType
 (
---     accountType ENUM('eoa', 'miner', 'exchange', 'deposit', 'scammer')
     idx INT UNSIGNED PRIMARY KEY,
     name VARCHAR(50),
     descriprion VARCHAR(200),
