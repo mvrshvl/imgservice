@@ -15,20 +15,25 @@ type AddressLinks struct {
 }
 
 type Node struct {
-	address       string
+	account       *database.Account
 	parent        *Node
 	txsWithParent database.Transactions
 	childs        map[string]*Node
 	cache         map[string]*Node
 }
 
-func New(address string, parent *Node, cache map[string]*Node) *Node {
+func New(ctx context.Context, address string, parent *Node, cache map[string]*Node) (*Node, error) {
+	acc, err := getAccount(ctx, address)
+	if err != nil {
+		return nil, err
+	}
+
 	return &Node{
-		address: address,
+		account: acc,
 		parent:  parent,
 		childs:  make(map[string]*Node),
 		cache:   cache,
-	}
+	}, nil
 }
 
 func Run(ctx context.Context, address string) (*[]AddressLinks, error) {
@@ -37,49 +42,60 @@ func Run(ctx context.Context, address string) (*[]AddressLinks, error) {
 		return nil, err
 	}
 
-	nodesCh := make(chan *Node, len(entity.Accounts))
-	// надо переписать на кластеризацию внутри Link
+	nodesCh := make(chan *AddressLinks, len(entity.Accounts))
+
 	for _, addr := range entity.Accounts {
+
 		addr := addr
 		go func() {
-			_, err := LinkNode(ctx, addr.Address)
+			links, err := LinkNode(ctx, addr.Address)
 			if err != nil {
 				fmt.Println("can't link node", addr.Address, err)
 			}
+
+			nodesCh <- links
 		}()
 	}
-	var (
-		nodes []*Node
-	)
+
+	nodes := make([]*AddressLinks, len(entity.Accounts))
+
+	for i := range nodes {
+		nodes[i] = <-nodesCh
+	}
+
+	return nil, err
 }
 
 func LinkNode(ctx context.Context, address string) (*AddressLinks, error) {
 	cache := make(map[string]*Node)
 
-	root := New(address, nil, cache)
+	root, err := New(ctx, address, nil, cache)
+	if err != nil {
+		return nil, err
+	}
 
-	err := root.linking(ctx)
+	err = root.linking(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	linksByCurrency, err := root.splitByCurrency(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	return &AddressLinks{
 		AllLinks:        root,
-		LinksByCurrency: root.splitByCurrency(),
+		LinksByCurrency: linksByCurrency,
 	}, nil
 }
 
 func (n *Node) linking(ctx context.Context) error {
-	acc, err := getAccount(ctx, n.address)
-	if err != nil {
-		return err
-	}
-
-	if acc.AccType == database.MinerAccount || acc.AccType == database.ExchangeAccount && n.parent != nil {
+	if n.account.AccType == database.MinerAccount || n.account.AccType == database.ExchangeAccount && n.parent != nil {
 		return nil
 	}
 
-	txs, err := getTransactions(ctx, n.address)
+	txs, err := getTransactions(ctx, n.account.Address)
 	if err != nil {
 		return err
 	}
@@ -87,11 +103,11 @@ func (n *Node) linking(ctx context.Context) error {
 	for _, tx := range txs {
 		address := tx.FromAddress
 
-		if address == n.address {
+		if address == n.account.Address {
 			address = tx.ToAddress
 		}
 
-		if n.parent != nil && address == n.parent.address {
+		if n.parent != nil && address == n.parent.account.Address {
 			continue
 		}
 
@@ -105,36 +121,48 @@ func (n *Node) linking(ctx context.Context) error {
 			continue
 		}
 
-		cachedNode := n.getCachedNode(address)
+		cachedNode, err := n.getCachedNode(ctx, address)
+		if err != nil {
+			return err
+		}
+
 		if cachedNode != nil {
-			n.childs[cachedNode.address] = cachedNode
+			n.childs[cachedNode.account.Address] = cachedNode
 			cachedNode.txsWithParent = append(cachedNode.txsWithParent, tx)
 
 			continue
 		}
 
-		err := n.addChild(address, tx).linking(ctx)
+		child, err := n.addChild(ctx, address, tx)
+		if err != nil {
+			return err
+		}
+
+		err = child.linking(ctx)
 		if err != nil {
 			return err
 		}
 	}
 
-	n.cache[n.address] = n
+	n.cache[n.account.Address] = n
 
 	return nil
 }
 
-func (n *Node) addChild(address string, tx *database.Transaction) *Node {
-	child := New(address, n, n.cache)
+func (n *Node) addChild(ctx context.Context, address string, tx *database.Transaction) (*Node, error) {
+	child, err := New(ctx, address, n, n.cache)
+	if err != nil {
+		return nil, err
+	}
 
-	n.childs[child.address] = child
+	n.childs[child.account.Address] = child
 	child.txsWithParent = append(child.txsWithParent, tx)
 
-	return child
+	return child, nil
 }
 
 func (n *Node) isCycle(address string) bool {
-	if n.address == address {
+	if n.account.Address == address {
 		return true
 	}
 
@@ -145,16 +173,20 @@ func (n *Node) isCycle(address string) bool {
 	return n.parent.isCycle(address)
 }
 
-func (n *Node) getCachedNode(address string) *Node {
+func (n *Node) getCachedNode(ctx context.Context, address string) (*Node, error) {
 	cached, ok := n.cache[address]
 	if !ok {
-		return nil
+		return nil, nil
 	}
 
-	copyCached := New(cached.address, n.parent, n.cache)
+	copyCached, err := New(ctx, cached.account.Address, n.parent, n.cache)
+	if err != nil {
+		return nil, err
+	}
+
 	copyCached.childs = cached.childs
 
-	return copyCached
+	return copyCached, nil
 }
 
 func getAccount(ctx context.Context, address string) (acc *database.Account, err error) {
@@ -190,8 +222,8 @@ func getTransactions(ctx context.Context, address string) (txs database.Transact
 	return
 }
 
-func (node *Node) splitByCurrency() map[string]*Node {
-	linksByCurrency := make(map[string]*Node)
+func (node *Node) splitByCurrency(ctx context.Context) (linksByCurrency map[string]*Node, err error) {
+	linksByCurrency = make(map[string]*Node)
 
 	for _, tx := range node.txsWithParent {
 		currency := wei
@@ -201,20 +233,27 @@ func (node *Node) splitByCurrency() map[string]*Node {
 		}
 
 		if _, ok := linksByCurrency[currency]; !ok {
-			linksByCurrency[currency] = New(node.address, node.parent, node.cache)
+			linksByCurrency[currency], err = New(ctx, node.account.Address, node.parent, node.cache)
+			if err != nil {
+				return nil, err
+			}
 		}
 
 		linksByCurrency[currency].txsWithParent = append(linksByCurrency[currency].txsWithParent, tx)
 	}
 
 	for _, node := range node.childs {
-		childLinks := node.splitByCurrency()
+		childLinks, err := node.splitByCurrency(ctx)
+		if err != nil {
+			return nil, err
+		}
+
 		for c, child := range childLinks {
 			if links, ok := linksByCurrency[c]; ok {
-				links.childs[child.address] = child
+				links.childs[child.account.Address] = child
 			}
 		}
 	}
 
-	return linksByCurrency
+	return linksByCurrency, nil
 }
