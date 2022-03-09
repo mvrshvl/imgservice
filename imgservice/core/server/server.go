@@ -2,12 +2,13 @@ package server
 
 import (
 	"context"
-	"imgservice/logger"
 	"net/http"
 	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
+
+	"imgservice/logger"
 )
 
 type Server struct {

@@ -2,10 +2,11 @@ package archive
 
 import (
 	"bytes"
-	"imgservice/core/image"
 	"os"
 	"reflect"
 	"testing"
+
+	"imgservice/core/image"
 )
 
 func TestArchive(t *testing.T) {

@@ -1,12 +1,14 @@
 package fs
 
 import (
-	"github.com/gin-gonic/gin"
-	"imgservice/imgerror"
+	"net/http"
 	"os"
+	"time"
+
+	"github.com/gin-gonic/gin"
+
+	"imgservice/imgerror"
 )
-import "time"
-import "net/http"
 
 type InMemoryFS map[string]http.File
 
@@ -51,15 +53,20 @@ func (f *InMemoryFile) Close() error {
 func (f *InMemoryFile) Stat() (os.FileInfo, error) {
 	return &InMemoryFileInfo{f}, nil
 }
+
 func (f *InMemoryFile) Readdir(count int) ([]os.FileInfo, error) {
 	res := make([]os.FileInfo, len(f.fs))
+
 	i := 0
+
 	for _, file := range f.fs {
 		res[i], _ = file.Stat()
 		i++
 	}
+
 	return res, nil
 }
+
 func (f *InMemoryFile) Read(b []byte) (int, error) {
 	i := 0
 	for f.at < int64(len(f.data)) && i < len(b) {
@@ -67,8 +74,10 @@ func (f *InMemoryFile) Read(b []byte) (int, error) {
 		i++
 		f.at++
 	}
+
 	return i, nil
 }
+
 func (f *InMemoryFile) Seek(offset int64, whence int) (int64, error) {
 	switch whence {
 	case 0:
@@ -78,6 +87,7 @@ func (f *InMemoryFile) Seek(offset int64, whence int) (int64, error) {
 	case 2:
 		f.at = int64(len(f.data)) + offset
 	}
+
 	return f.at, nil
 }
 
@@ -94,10 +104,9 @@ func (s *InMemoryFileInfo) IsDir() bool        { return false }
 func (s *InMemoryFileInfo) Sys() interface{}   { return nil }
 
 const (
-	storageKey  = "storage"
-	errNotFound = imgerror.IMGError("link unavailable")
-	errContext  = imgerror.IMGError("storage is not in context")
-	errType     = imgerror.IMGError("incorrect type")
+	storageKey = "storage"
+	errContext = imgerror.IMGError("storage is not in context")
+	errType    = imgerror.IMGError("incorrect type")
 )
 
 func New() InMemoryFS {

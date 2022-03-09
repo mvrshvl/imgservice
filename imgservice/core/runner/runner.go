@@ -3,10 +3,6 @@ package runner
 import (
 	"context"
 	"fmt"
-	"imgservice/config"
-	"imgservice/core/fs"
-	"imgservice/core/server"
-	"imgservice/logger"
 	"io"
 	"os"
 	"os/signal"
@@ -14,6 +10,11 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
+
+	"imgservice/config"
+	"imgservice/core/fs"
+	"imgservice/core/server"
+	"imgservice/logger"
 )
 
 type Runner struct {

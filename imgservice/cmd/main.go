@@ -2,9 +2,10 @@ package main
 
 import (
 	"context"
+	"log"
+
 	"imgservice/config"
 	"imgservice/core/runner"
-	"log"
 )
 
 func main() {

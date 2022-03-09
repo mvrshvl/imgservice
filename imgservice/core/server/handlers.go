@@ -2,10 +2,12 @@ package server
 
 import (
 	"fmt"
+	"net/http"
+
 	"github.com/gin-gonic/gin"
+
 	"imgservice/core/fs"
 	"imgservice/html"
-	"net/http"
 )
 
 func HomeGetHandler(ctx *gin.Context) {

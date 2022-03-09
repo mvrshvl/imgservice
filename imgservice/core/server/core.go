@@ -1,13 +1,15 @@
 package server
 
 import (
+	"mime/multipart"
+	"strconv"
+
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+
 	"imgservice/core/archive"
 	"imgservice/core/fs"
 	"imgservice/core/image"
-	"mime/multipart"
-	"strconv"
 )
 
 func resize(ctx *gin.Context) (string, error) {
@@ -122,6 +124,7 @@ func unzip(file *multipart.FileHeader) ([]*image.Image, error) {
 
 func rangeImages(imgs []*image.Image, process processImage) ([]*image.Image, error) {
 	resizedIMGs := make([]*image.Image, len(imgs))
+
 	for i, img := range imgs {
 		resizedIMG, err := process(img)
 		if err != nil {

@@ -3,16 +3,27 @@ package image
 import (
 	"bytes"
 	"fmt"
-	"github.com/sunshineplan/imgconv"
 	"image"
-	"imgservice/imgerror"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/sunshineplan/imgconv"
+
+	"imgservice/imgerror"
 )
 
 const (
 	ErrFormat = imgerror.IMGError("incorrect image format")
+
+	jpg  = "jpg"
+	jpeg = "jpeg"
+	png  = "png"
+	gif  = "gif"
+	tif  = "tif"
+	tiff = "tiff"
+	pdf  = "pdf"
+	bmp  = "bmp"
 )
 
 type Image struct {
@@ -76,35 +87,35 @@ func render(img image.Image, name string, format imgconv.Format) (*Image, error)
 func GetFormat(format imgconv.Format) string {
 	switch format {
 	case imgconv.JPEG:
-		return "jpg"
+		return jpeg
 	case imgconv.PNG:
-		return "png"
+		return png
 	case imgconv.GIF:
-		return "gif"
+		return gif
 	case imgconv.TIFF:
-		return "tif"
+		return tif
 	case imgconv.BMP:
-		return "bmp"
+		return bmp
 	case imgconv.PDF:
-		return "pdf"
+		return pdf
 	default:
-		return "png"
+		return png
 	}
 }
 
 func GetFormatFromString(format string) (imgconv.Format, error) {
 	switch format {
-	case "jpg", "jpeg":
+	case jpg, jpeg:
 		return imgconv.JPEG, nil
-	case "png":
+	case png:
 		return imgconv.PNG, nil
-	case "gif":
+	case gif:
 		return imgconv.GIF, nil
-	case "tif", "tiff":
+	case tif, tiff:
 		return imgconv.TIFF, nil
-	case "bmp":
+	case bmp:
 		return imgconv.BMP, nil
-	case "pdf":
+	case pdf:
 		return imgconv.PDF, nil
 	default:
 		return 0, ErrFormat

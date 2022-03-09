@@ -2,19 +2,17 @@ package image
 
 import (
 	"fmt"
+	"image"
+	"image/color"
+	"strings"
+
 	"github.com/sunshineplan/imgconv"
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/basicfont"
 	"golang.org/x/image/math/fixed"
-	"image"
-	"image/color"
-	"imgservice/imgerror"
-	"strings"
 )
 
 const (
-	errorFormat = imgerror.IMGError("Incorrect format")
-
 	maxWidthWatermark  = 240
 	maxHeightWatermark = 20
 
@@ -42,6 +40,7 @@ func (i *Image) Convert(format imgconv.Format) (*Image, error) {
 
 func (i *Image) GrayScaling() (*Image, error) {
 	grayImg := image.NewGray(i.img.Bounds())
+
 	for y := i.img.Bounds().Min.Y; y < i.img.Bounds().Max.Y; y++ {
 		for x := i.img.Bounds().Min.X; x < i.img.Bounds().Max.X; x++ {
 			grayImg.Set(x, y, i.img.At(x, y))
@@ -83,7 +82,7 @@ func (i *Image) generateWatermark() image.Image {
 
 	for j := 0; j < len(info); j += maxLenWatermark {
 		if len(info) < j+maxLenWatermark {
-			mark = info[j:len(info)]
+			mark = info[j:]
 		} else {
 			mark = info[j : j+maxLenWatermark]
 		}

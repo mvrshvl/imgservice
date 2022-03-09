@@ -2,9 +2,10 @@ package image
 
 import (
 	"bytes"
-	"github.com/sunshineplan/imgconv"
 	"os"
 	"testing"
+
+	"github.com/sunshineplan/imgconv"
 )
 
 func TestResize(t *testing.T) {

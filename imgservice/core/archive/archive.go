@@ -4,8 +4,9 @@ import (
 	"archive/zip"
 	"bytes"
 	"fmt"
-	"imgservice/core/image"
 	"io"
+
+	"imgservice/core/image"
 )
 
 func Zip(images []*image.Image) ([]byte, error) {

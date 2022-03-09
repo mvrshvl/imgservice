@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"imgservice/logger"
 	"io"
 	"net/http"
 	"testing"
@@ -12,6 +11,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
+
+	"imgservice/logger"
 )
 
 func TestServer_StartStop(t *testing.T) {
