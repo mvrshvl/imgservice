@@ -49,4 +49,15 @@ const (
   </form>
  </body>
 </html>`
+
+	Download = `<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+ <head>
+  <meta http-equiv="content-type" content="text/html; charset=utf-8">
+  <title>Download file</title>
+ </head>
+ <body>
+  <p><a href="localhost:6060/download/%s">Скачать изображения</a></p>
+ </body>
+</html>`
 )

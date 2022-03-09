@@ -49,6 +49,7 @@ func SetGET(router *gin.Engine) {
 	router.GET(grayscale, Gray)
 	router.GET(convert, Convert)
 	router.GET(watermark, Watermark)
+	router.GET(download, Download)
 }
 
 func SetPOST(router *gin.Engine) {

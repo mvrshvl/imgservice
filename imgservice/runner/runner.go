@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"imgservice/config"
+	"imgservice/fs"
 	"imgservice/logger"
 	"imgservice/server"
 	"io"
@@ -41,7 +42,7 @@ func (r *Runner) Run(ctx context.Context, cfg *config.Config) (context.Context, 
 func (r *Runner) runServer(ctx context.Context, cfg config.Server) {
 	router := gin.New()
 
-	setMiddlewares(router)
+	setMiddlewares(router, fs.New())
 
 	server.SetGET(router)
 	server.SetPOST(router)
@@ -100,6 +101,6 @@ func setLogger(ctx context.Context, logLevel logrus.Level, logPath string) (cont
 	return ctxWithLogger, nil
 }
 
-func setMiddlewares(router *gin.Engine) {
-	router.Use(gin.Recovery())
+func setMiddlewares(router *gin.Engine, strg fs.InMemoryFS) {
+	router.Use(gin.Recovery(), fs.SetCtx(strg))
 }

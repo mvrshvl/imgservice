@@ -1,8 +1,11 @@
 package server
 
 import (
+	"fmt"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"imgservice/archive"
+	"imgservice/fs"
 	"imgservice/html"
 	"imgservice/image"
 	"mime/multipart"
@@ -71,7 +74,13 @@ func ResizePercentPOST(ctx *gin.Context) {
 		return
 	}
 
-	ctx.Data(http.StatusOK, "text/html; charset=utf-8", resizedArchive)
+	id, err := saveFile(ctx, resizedArchive)
+	if err != nil {
+		ctx.Data(http.StatusBadRequest, "text/html; charset=utf-8", []byte(err.Error()))
+		return
+	}
+
+	ctx.Data(http.StatusOK, "text/html; charset=utf-8", []byte(fmt.Sprintf(html.Download, id)))
 }
 
 func Gray(ctx *gin.Context) {
@@ -84,4 +93,32 @@ func Watermark(ctx *gin.Context) {
 
 func Convert(ctx *gin.Context) {
 	ctx.Data(http.StatusOK, "text/html; charset=utf-8", []byte("convert page"))
+}
+
+func Download(ctx *gin.Context) {
+	id := ctx.Param("id")
+
+	storage, err := fs.GetCtx(ctx)
+	if err != nil {
+		ctx.Data(http.StatusBadRequest, "text/html; charset=utf-8", []byte(err.Error()))
+		return
+	}
+
+	ctx.FileFromFS(id, storage)
+}
+
+func saveFile(ctx *gin.Context, raw []byte) (string, error) {
+	id, err := uuid.NewUUID()
+	if err != nil {
+		return "", err
+	}
+
+	storage, err := fs.GetCtx(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	storage.Add(id.String(), raw)
+
+	return id.String(), nil
 }

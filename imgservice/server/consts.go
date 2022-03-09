@@ -8,4 +8,5 @@ const (
 	grayscale         = "/grayscale"
 	watermark         = "/watermark"
 	resizePercentLoad = "/resize-percent/load"
+	download          = "/download/:id"
 )
