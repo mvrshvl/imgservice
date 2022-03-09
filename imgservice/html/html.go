@@ -27,7 +27,7 @@ const (
  </body>
 </html>`
 
-	Resize = `
+	ResizePercent = `
 <!DOCTYPE html>
 <html>
  <head>
@@ -37,7 +37,7 @@ const (
  <body>
   <form method="post" action="/resize-percent/load" enctype="multipart/form-data">
 	  <p><b>Размер в процентах:</b><br>
-	   <input name="size" type="text" size="40">
+	   <input name="size" type="text" size="10">
 	  </p>
 	 <div>
 	   <label for="file">Choose file to upload</label>
@@ -58,6 +58,98 @@ const (
  </head>
  <body>
   <p><a href="localhost:6060/download/%s">Скачать изображения</a></p>
+ </body>
+</html>`
+
+	Resize = `
+<!DOCTYPE html>
+<html>
+ <head>
+  <meta charset="utf-8">
+  <title>Resize</title>
+ </head>
+ <body>
+  <form method="post" action="/resize/load" enctype="multipart/form-data">
+	  <p><b>Размер в пикселях:</b><br>
+	   <input name="width" type="text" size="10">
+	   <input name="height" type="text" size="10">
+	  </p>
+	 <div>
+	   <label for="file">Choose file to upload</label>
+	   <input type="file" id="file" name="file" multiple>
+	 </div>
+	 <div>
+	   <button>Submit</button>
+	 </div>
+  </form>
+ </body>
+</html>`
+
+	GrayScale = `
+<!DOCTYPE html>
+<html>
+ <head>
+  <meta charset="utf-8">
+  <title>Resize</title>
+ </head>
+ <body>
+  <form method="post" action="/grayscale/load" enctype="multipart/form-data">
+	 <div>
+	   <label for="file">Choose file to upload</label>
+	   <input type="file" id="file" name="file" multiple>
+	 </div>
+	 <div>
+	   <button>Submit</button>
+	 </div>
+  </form>
+ </body>
+</html>`
+
+	Convert = `
+<!DOCTYPE html>
+<html>
+ <head>
+  <meta charset="utf-8">
+  <title>Resize</title>
+ </head>
+ <body>
+  <form method="post" action="/convert/load" enctype="multipart/form-data">
+	 <select id="format" name="format">
+	  <option value="png">PNG</option>
+	  <option value="jpeg">JPEG</option>
+	  <option value="pdf">PDF</option>
+	  <option value="tiff">TIFF</option>
+	  <option value="bmp">BMP</option>
+	  <option value="gif">GIF</option>
+	 </select>
+	 <div>
+	   <label for="file">Choose file to upload</label>
+	   <input type="file" id="file" name="file" multiple>
+	 </div>
+	 <div>
+	   <button>Submit</button>
+	 </div>
+  </form>
+ </body>
+</html>`
+
+	Watermark = `
+<!DOCTYPE html>
+<html>
+ <head>
+  <meta charset="utf-8">
+  <title>Resize</title>
+ </head>
+ <body>
+  <form method="post" action="/watermark/load" enctype="multipart/form-data">
+	 <div>
+	   <label for="file">Choose file to upload</label>
+	   <input type="file" id="file" name="file" multiple>
+	 </div>
+	 <div>
+	   <button>Submit</button>
+	 </div>
+  </form>
  </body>
 </html>`
 )

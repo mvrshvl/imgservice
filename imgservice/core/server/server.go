@@ -43,15 +43,19 @@ func (server *Server) Stop(ctx context.Context) {
 }
 
 func SetGET(router *gin.Engine) {
-	router.GET(home, Home)
-	router.GET(resize, Resize)
-	router.GET(resizePercent, ResizePercent)
-	router.GET(grayscale, Gray)
-	router.GET(convert, Convert)
-	router.GET(watermark, Watermark)
-	router.GET(download, Download)
+	router.GET(homePath, HomeGetHandler)
+	router.GET(resizePath, ResizeGetHandler)
+	router.GET(resizePercentPath, ResizePercentGetHandler)
+	router.GET(grayscalePath, GrayScaleGetHandler)
+	router.GET(convertPath, ConvertGetHandler)
+	router.GET(watermarkPath, WatermarkGetHandler)
+	router.GET(downloadPath, DownloadGetHandler)
 }
 
 func SetPOST(router *gin.Engine) {
-	router.POST(resizePercentLoad, ResizePercentPOST)
+	router.POST(resizePercentLoadPath, ResizePercentPostHandler)
+	router.POST(resizePathLoad, ResizePostHandler)
+	router.POST(grayscalePathLoad, GrayPostHandler)
+	router.POST(convertPathLoad, ConvertPostHandler)
+	router.POST(watermarkPathLoad, WatermarkPostHandler)
 }

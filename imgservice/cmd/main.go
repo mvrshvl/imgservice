@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"imgservice/config"
-	"imgservice/runner"
+	"imgservice/core/runner"
 	"log"
 )
 

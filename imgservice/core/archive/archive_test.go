@@ -2,7 +2,7 @@ package archive
 
 import (
 	"bytes"
-	"imgservice/image"
+	"imgservice/core/image"
 	"os"
 	"reflect"
 	"testing"

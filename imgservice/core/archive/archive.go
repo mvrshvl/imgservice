@@ -4,7 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"fmt"
-	"imgservice/image"
+	"imgservice/core/image"
 	"io"
 )
 
