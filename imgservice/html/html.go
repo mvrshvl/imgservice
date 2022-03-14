@@ -57,7 +57,7 @@ const (
   <title>Download file</title>
  </head>
  <body>
-  <p><a href="localhost:6060/download/%s">Скачать изображения</a></p>
+  <p><a href="localhost:6060/download/%s" target="_blank">Скачать изображения</a></p>
  </body>
 </html>`
 

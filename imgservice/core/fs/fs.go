@@ -35,6 +35,7 @@ func (fs InMemoryFS) Add(name string, data []byte) {
 type InMemoryFile struct {
 	at   int64
 	Name string
+	//ext  string
 	data []byte
 	fs   InMemoryFS
 }
@@ -48,6 +49,7 @@ func LoadFile(name string, data []byte, fs InMemoryFS) *InMemoryFile {
 
 // Implements the http.File interface
 func (f *InMemoryFile) Close() error {
+	f.fs.Add(f.Name, f.data)
 	return nil
 }
 func (f *InMemoryFile) Stat() (os.FileInfo, error) {
@@ -74,6 +76,8 @@ func (f *InMemoryFile) Read(b []byte) (int, error) {
 		i++
 		f.at++
 	}
+
+	//f.fs.Add(f.Name, b)
 
 	return i, nil
 }

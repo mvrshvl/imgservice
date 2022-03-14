@@ -10,7 +10,7 @@ import (
 )
 
 func TestArchive(t *testing.T) {
-	file, err := os.Open("../test_img.jpeg")
+	file, err := os.Open("../../test_img.jpeg")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -32,7 +32,7 @@ func TestArchive(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	archive, err := Zip([]*image.Image{img})
+	archive, err := Zip([]*image.Image{img, img, img, img, img, img, img, img, img, img, img, img, img, img, img})
 	if err != nil {
 		t.Fatal(err)
 	}
