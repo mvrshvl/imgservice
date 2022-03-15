@@ -30,7 +30,7 @@ type Image struct {
 	img     image.Image
 	format  imgconv.Format
 	name    string
-	changed time.Time
+	created time.Time
 	bytes   []byte
 }
 
@@ -51,7 +51,7 @@ func New(src *bytes.Buffer, info os.FileInfo) (*Image, error) {
 		img:     img,
 		format:  imgFmt,
 		name:    strings.Split(info.Name(), ".")[0],
-		changed: info.ModTime(),
+		created: info.ModTime(),
 		bytes:   rawImage,
 	}, nil
 }

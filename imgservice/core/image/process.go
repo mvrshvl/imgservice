@@ -14,7 +14,7 @@ import (
 
 const (
 	maxWidthWatermark  = 240
-	maxHeightWatermark = 20
+	maxHeightWatermark = 16
 
 	positionMarkY = 12
 	positionMarkX = 0
@@ -59,7 +59,7 @@ func (i *Image) Watermark() (*Image, error) {
 }
 
 func (i *Image) generateWatermark() image.Image {
-	info := fmt.Sprintf("%s; %s", strings.Split(i.name, ".")[0], i.changed.Format("02 Jan 06 15:04 MST"))
+	info := fmt.Sprintf("%s; %s", strings.Split(i.name, ".")[0], i.created.Format("02.01.06 15:04:05 MST"))
 
 	rectWidth := maxWidthWatermark
 	rectHeight := maxHeightWatermark
@@ -68,27 +68,41 @@ func (i *Image) generateWatermark() image.Image {
 		rectHeight = rectHeight * (len(info)/maxLenWatermark + 1)
 	}
 
-	imgWatermark := image.NewRGBA(image.Rect(0, 0, rectWidth, rectHeight))
+	watermark := newWatermark(rectWidth, rectHeight)
+
+	drawString(watermark, info)
+
+	height, width := i.getWatermarkSize(rectWidth, rectHeight)
+
+	return imgconv.Resize(watermark, imgconv.ResizeOption{Height: height, Width: width})
+}
+
+func newWatermark(width, height int) *image.RGBA {
+	imgWatermark := image.NewRGBA(image.Rect(0, 0, width, height))
 	for y := imgWatermark.Bounds().Min.Y; y < imgWatermark.Bounds().Max.Y; y++ {
 		for x := imgWatermark.Bounds().Min.X; x < imgWatermark.Bounds().Max.X; x++ {
 			imgWatermark.Set(x, y, color.RGBA{255, 255, 0, 255})
 		}
 	}
 
+	return imgWatermark
+}
+
+func drawString(img *image.RGBA, toDraw string) {
 	var (
 		mark      string
 		yPosition = positionMarkY
 	)
 
-	for j := 0; j < len(info); j += maxLenWatermark {
-		if len(info) < j+maxLenWatermark {
-			mark = info[j:]
+	for j := 0; j < len(toDraw); j += maxLenWatermark {
+		if len(toDraw) < j+maxLenWatermark {
+			mark = toDraw[j:]
 		} else {
-			mark = info[j : j+maxLenWatermark]
+			mark = toDraw[j : j+maxLenWatermark]
 		}
 
 		d := &font.Drawer{
-			Dst:  imgWatermark,
+			Dst:  img,
 			Src:  image.Black,
 			Face: basicfont.Face7x13,
 			Dot:  fixed.P(positionMarkX, yPosition),
@@ -98,10 +112,6 @@ func (i *Image) generateWatermark() image.Image {
 
 		yPosition += yPosition
 	}
-
-	height, width := i.getWatermarkSize(rectWidth, rectHeight)
-
-	return imgconv.Resize(imgWatermark, imgconv.ResizeOption{Height: height, Width: width})
 }
 
 func (i *Image) getWatermarkSize(widthSrc, heightSrc int) (height int, width int) {
