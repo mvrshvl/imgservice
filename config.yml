@@ -1,17 +1,5 @@
-clustering:
-  maxBlockDiff: 10000
-  maxETHDiff: 0.01
-
-log:
-  level: debug
-
-database:
-  address : "127.0.0.1:3306"
-  user : "root"
-  password : "testPASS25!"
-  name : "test"
-  driver : "mysql"
-  clean: false
-
-ethereum:
-  address : "http://localhost:8545"
+server:
+  address: ":6060"
+  level: info
+  timeout: 1m
+  log_path: "./logs"

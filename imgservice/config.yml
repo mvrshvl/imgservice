@@ -1,5 +1,0 @@
-server:
-  address: ":6060"
-  level: info
-  timeout: 1m
-  log_path: "./logs"
